@@ -1,0 +1,15 @@
+Metric Name,Value,Target / Interpretation
+Retrieval Precision @ 3 (Overall),89.5%,>= 85.0% (Meets high clinical precision)
+Retrieval Precision @ 5 (Overall),89.5%,>= 80.0% (High multi-document relevance)
+Retrieval Precision @ 5 (General Definitional),82.2%,100.0% (General reviews & patient guide retrieved)
+Retrieval Precision @ 5 (Screening Guidelines),96.0%,>= 85.0% (Grounded in USPSTF & AHRQ evidence)
+Citation Compliance Rate,100.0%,100.0% (All answered queries contain inline citations)
+Citation Accuracy,100.0%,100.0% (All citations ground to retrieved chunks)
+Refusal Recall (Out-of-Domain),100.0%,100.0% (5/5 off-topic queries intercepted before LLM)
+Refusal Precision (No False Refusals),100.0%,100.0% (0 false refusals on in-domain questions)
+In-Domain Top-1 Similarity (Mean ± Std),0.733 ± 0.064,"Range: [0.574, 0.818] (Well above threshold 0.50)"
+Out-of-Domain Top-1 Similarity (Mean ± Std),0.258 ± 0.020,"Range: [0.221, 0.281] (Well below threshold 0.50)"
+Confidence Safety Separation Margin,0.294,> 0.35 safety delta separating in vs out-of-domain
+Unique Chunks Retrieved,88 / 525,16.8% corpus coverage across 24 test queries
+Average Retrieval Latency,27.7 ms,p95 = 22.5 ms (Real-time ChromaDB query)
+Average Total Query Latency,28.1 ms,p95 = 23.1 ms (Includes safety check & generation)
