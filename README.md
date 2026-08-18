@@ -6,7 +6,7 @@ MedRetriv is an AI Clinical Decision Support (CDS) Retrieval-Augmented Generatio
 
 ## Key Capabilities & Highlights
 
-* **5-Document Authoritative Corpus**: Covers both screening policy/trials and foundational disease definitions across 387 total pages (525 section-aware chunks).
+* **5-Document Authoritative Corpus**: Covers both screening policy/trials and foundational disease definitions across 387 total pages (523 section-aware chunks).
 * **Hard Citation Enforcement**: Every factual claim is bound to an exact inline citation `[Source: <filename>, Section: <section>, Page: <page>]`.
 * **Pre-Generation Safety Gating**: Zero-hallucination defense using a cosine similarity threshold (`CONFIDENCE_THRESHOLD = 0.50`) that intercepts out-of-domain queries before calling the LLM.
 * **Post-Generation Citation Verification**: Programmatic audit step checking every generated citation against retrieved context.
@@ -31,8 +31,8 @@ Evaluated across a standardized 24-question benchmark suite spanning general def
 | **Refusal Precision (No False Refusals)** | **100.0%** | 0 false refusals on valid clinical questions |
 | **In-Domain Top-1 Similarity** | **0.733 ± 0.064** | Range: $[0.574, 0.818]$ (Well above $0.50$) |
 | **Out-of-Domain Top-1 Similarity** | **0.258 ± 0.020** | Range: $[0.109, 0.281]$ (Well below $0.50$) |
-| **Average Retrieval Latency** | **22.2 ms** | $p95 = 21.4\text{ ms}$ (Real-time ChromaDB semantic search) |
-| **Average Total Query Latency** | **22.4 ms** | $p95 = 21.8\text{ ms}$ (Includes safety check & generation) |
+| **Retrieval Latency by Category** | **Out-of-Domain: ~19 ms \| Screening: ~19–23 ms \| General Definitional: ~44–97 ms** | Varies with retrieval breadth and model warm-up state |
+| **Total Query Latency by Category** | **Out-of-Domain: ~19 ms \| Screening: ~20–23 ms \| General Definitional: ~45–98 ms** | Includes safety check & synthesis ($< 100\text{ ms}$ real-time) |
 
 ---
 
@@ -45,7 +45,7 @@ Evaluated across a standardized 24-question benchmark suite spanning general def
                              Ingestion Layer (Loader ──► Cleaner ──► Chunker)
                                                     │
                                                     ▼
-                                            chunks.json (525 Chunks)
+                                            chunks.json (523 Chunks)
                                                     │
                                                     ▼
                              Embeddings (all-MiniLM-L6-v2, 384d Normalized)
@@ -171,10 +171,10 @@ MedRetriv/
 │   └── retrieval_spot_check_report.md
 │
 ├── data/
-│   ├── chroma/                                 # Active ChromaDB vector store (525 chunks)
+│   ├── chroma/                                 # Active ChromaDB vector store (523 chunks)
 │   ├── processed/
-│   │   ├── chunks.json                         # 525 structured clinical chunks
-│   │   └── embedded_documents.json             # 525 precomputed vector embeddings
+│   │   ├── chunks.json                         # 523 structured clinical chunks
+│   │   └── embedded_documents.json             # 523 precomputed vector embeddings
 │   └── raw/                                    # Exact 5-document authoritative corpus
 │
 ├── docs/

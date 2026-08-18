@@ -382,7 +382,7 @@ sim_stats = {
 }
 
 # 5. Corpus Coverage
-# Total chunks = 525
+# Total chunks = 523
 with open("data/processed/chunks.json", "r", encoding="utf-8") as f:
     all_chunks = json.load(f)
 
