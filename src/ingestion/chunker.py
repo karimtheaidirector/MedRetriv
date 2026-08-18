@@ -110,7 +110,10 @@ DOCUMENT_CONFIGS = {
             r"^Conclusions\s*$",
         ],
         header_patterns=[
-            r"Breast Cancer Screening\s+\S+\s+Kaiser Permanente",
+            r"(?i)Breast\s+Cancer\s+Screening\s+\d{1,4}\s+Kaiser\s+Permanente\s+Research\s+Affiliates\s+EPC",
+            r"(?i)Kaiser\s+Permanente\s+Research\s+Affiliates\s+EPC\s+\d{1,4}\s+Breast\s+Cancer\s+Screening",
+            r"(?i)Breast\s+Cancer\s+Screening\s+Kaiser\s+Permanente\s+Research\s+Affiliates\s+EPC\s+\d{1,4}",
+            r"(?i)Kaiser\s+Permanente\s+Research\s+Affiliates\s+EPC\s+Breast\s+Cancer\s+Screening",
         ],
         footer_patterns=[],
         skip_sections=[
@@ -139,10 +142,21 @@ DOCUMENT_CONFIGS = {
             r"^ARTICLE INFORMATION\s*$",
             r"^REFERENCES\s*$",
         ],
-        header_patterns=[],
+        header_patterns=[
+            r"(?i)JAMA\s*\|\s*US\s*Preventive\s*Services\s*Task\s*Force\s*\|\s*RECOMMENDATION\s*STATEMENT",
+            r"(?i)USPSTF\s*Recommendation:\s*Screening\s*for\s*Breast\s*Cancer\s+US\s*Preventive\s*Services\s*Task\s*Force\s+Clinical\s*Review\s*&\s*Education",
+            r"(?i)Clinical\s*Review\s*&\s*Education\s+US\s*Preventive\s*Services\s*Task\s*Force\s+USPSTF\s*Recommendation:\s*Screening\s*for\s*Breast\s*Cancer",
+            r"(?i)USPSTF\s*Recommendation:\s*Screening\s*for\s*Breast\s*Cancer\s+Clinical\s*Review\s*&\s*Education",
+            r"(?i)Clinical\s*Review\s*&\s*Education\s+USPSTF\s*Recommendation:\s*Screening\s*for\s*Breast\s*Cancer",
+        ],
         footer_patterns=[
-            r"2024 American Medical Association",
-            r"American Medical Association\.\s*All rights reserved",
+            r"(?i)\b\d{1,4}\s+JAMA\s+[A-Za-z]+\s+\d{1,2},\s*\d{4}\s+Volume\s+\d+,\s*Number\s+\d+\s*(\(Reprinted\))?\s*jama\.com\b",
+            r"(?i)\bjama\.com\s*(\(Reprinted\))?\s*JAMA\s+[A-Za-z]+\s+\d{1,2},\s*\d{4}\s+Volume\s+\d+,\s*Number\s+\d+\s+\d{1,4}\b",
+            r"(?i)[©]?\s*\d{4}\s*American\s*Medical\s*Association\.\s*All\s*rights\s*reserved.*",
+            r"(?i)\bJAMA\.\s*\d{4};\s*\d+\(\d+\):\s*\d+-\d+\.\s*doi:10\.1001/jama\.\d+\.\d+",
+            r"(?i)\bCME\s+at\s+jamacmelookup\.com\b",
+            r"(?i)\bjamanetworkopen\.com\b",
+            r"(?i)\bjamaoncology\.com\b",
         ],
         skip_sections=[
             r"^REFERENCES$",
@@ -162,15 +176,13 @@ DOCUMENT_CONFIGS = {
             r"^Acknowledgments?\s*$",
         ],
         header_patterns=[
-            r"^OPEN ACCESS$",
-            r"^EDITED BY",
-            r"^REVIEWED BY",
-            r"^TYPE\s",
+            r"(?i)^\s*(OPEN ACCESS|EDITED BY|REVIEWED BY|TYPE (Review|Original Research))\b.*",
         ],
         footer_patterns=[
-            r"Pasi et al\.",
-            r"Frontiers in Oncology",
-            r"frontiersin\.org",
+            r"(?i)Pasi\s+et\s+al\.\s+10\.3389/fonc\.\d+\.\d+",
+            r"(?i)Frontiers\s+in\s+Oncology\s+frontiersin\.org\s*\d*",
+            r"(?i)^\s*frontiersin\.org\s*$",
+            r"(?i)DOI\s+10\.3389/fonc\.\d+\.\d+",
         ],
         skip_sections=[
             r"^Glossary$",
@@ -199,10 +211,14 @@ DOCUMENT_CONFIGS = {
             r"^REFERENCES\s*$",
         ],
         header_patterns=[
-            r"^REVIEW ARTICLE OPEN$",
+            r"(?i)^REVIEW ARTICLE OPEN$",
         ],
         footer_patterns=[
-            r"Signal Transduction and Targeted Therapy",
+            r"(?i)Breast\s+cancer:\s*pathogenesis\s+and\s+treatments\s+Xiong\s+et\s+al\.\s*\d*",
+            r"(?i)Signal\s+Transduction\s+and\s+Targeted\s+Therapy\s*\(\d{4}\)\s*\d+:\d+",
+            r"(?i)www\.nature\.com/sigtrans",
+            r"(?i)SPRINGER\s+NATURE\s*",
+            r"(?i)Citation:\s*Signal\s+Transduction\s+and\s+Targeted\s+Therapy\s*\(\d{4}\)\s*\d+:\d+",
         ],
         skip_sections=[
             r"^REFERENCES$",

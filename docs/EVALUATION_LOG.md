@@ -136,6 +136,24 @@
 
 ---
 
+### Issue 11: Mid-Sentence Header/Footer Leakage & Cross-Page De-Hyphenation Fix
+* **Discovered**: Day 4 — Live testing surfaced garbled text like `"...JAMA June 11, 2024 Volume 331, Number 22 (Reprinted) jama.com mate that a strategy..."` where a running page footer was spliced into the middle of the hyphenated word `"estimate"`.
+* **Root Cause**:
+  1. Header/footer stripping in `src/ingestion/cleaner.py` only checked the strict `lines[0]` and `lines[-1]` boundaries; when PDF extractors placed footers on non-terminal lines (or with zero spaces like `June11,2024` from `pdfplumber`), patterns failed to match and lines leaked into the text flow.
+  2. Page boundary transitions: When Page $N$ ended with a hyphenated word (e.g. `esti-`), the unstripped footer text was appended directly before Page $N+1$'s opening (`mate that a strategy...`), breaking word coherence across the page seam.
+* **Change**:
+  * **Comprehensive Header/Footer Stripping**: Upgraded `src/ingestion/cleaner.py` with multi-line and inline pattern matching (`RUNNING_HEADER_FOOTER_PATTERNS`) covering JAMA citation lines, AHRQ Kaiser Permanente headers (including Roman numeral pages `ii`, `iii`), Frontiers footers (`frontiersin.org`), Nature headers (`SPRINGER NATURE`, `sigtrans`), and NCI headers.
+  * **Zero-Space Regex Matching**: Updated pattern tokens to handle variable spacing (`\s*`) introduced by PDF table/layout extractors.
+  * **Cross-Page De-Hyphenation**: Implemented seamless cross-page hyphenation healing in `clean_pages()` that detects when Page $N$ ends with `(\w+)-$` and Page $N+1$ begins with `^([a-z]\w*)`, automatically stitching them into the complete unbroken word (`esti-` + `mate` $\rightarrow$ `estimate`).
+  * Re-ran full ingestion, embedding, and ChromaDB indexing pipelines.
+* **Verification**:
+  * Total chunk count: **523 chunks** (stable from 525, reflecting the clean elimination of leaked running headers).
+  * Scanned all 523 chunks for `jama.com`, `Reprinted`, `frontiersin.org`, `sigtrans`, and `Springer Nature`: **0 leaked instances found**.
+  * Verified live query `"At what age should screening mammography begin?"` — generated answer is clean with 100% valid citations and zero garbled tokens.
+  * Full 24-question benchmark re-evaluated successfully (**89.5% Precision@5**, **100% Citation Accuracy**, **100% Refusal Precision/Recall**).
+
+---
+
 ## 3. Chunk & Corpus Statistics
 
 ### Document Breakdown & Section Counts
