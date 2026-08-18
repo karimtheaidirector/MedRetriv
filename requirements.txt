@@ -1,0 +1,83 @@
+# =========================
+# RAG / LLM Framework
+# =========================
+langchain
+langchain-community
+langchain-core
+langchain-openai
+langchain-huggingface
+
+# =========================
+# Vector Database
+# =========================
+chromadb
+
+# =========================
+# Embeddings / NLP
+# =========================
+sentence-transformers
+transformers
+huggingface-hub
+torch
+
+# =========================
+# Document Loading / Parsing
+# =========================
+pypdf
+pymupdf
+pdfplumber
+unstructured
+
+# =========================
+# Data Processing
+# =========================
+numpy
+pandas
+
+# =========================
+# Configuration / Environment
+# =========================
+python-dotenv
+pydantic
+pydantic-settings
+
+# =========================
+# API / Backend
+# =========================
+fastapi
+uvicorn[standard]
+
+# =========================
+# HTTP / External APIs
+# =========================
+requests
+httpx
+
+# =========================
+# Evaluation
+# =========================
+ragas
+datasets
+
+# =========================
+# ML / Similarity / Retrieval
+# =========================
+scikit-learn
+rank-bm25
+
+# =========================
+# Experimentation / Visualization
+# =========================
+matplotlib
+tqdm
+
+# =========================
+# Testing
+# =========================
+pytest
+pytest-asyncio
+
+# =========================
+# Optional UI
+# =========================
+streamlit
