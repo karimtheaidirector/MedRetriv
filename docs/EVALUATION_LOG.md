@@ -124,6 +124,16 @@
   * `"what is breast cancer?"` $\rightarrow$ Correctly bypassed conversational filter to execute full clinical RAG and produce 100% grounded inline citations.
   * `"what is the treatment for a broken arm?"` $\rightarrow$ Correctly bypassed conversational filter and triggered pre-generation clinical refusal.
 
+### Issue 10: Unified Brand Identity & Rebrand to MedRetriv
+* **Discovered**: Day 4 — Legacy prototype strings and titles referenced "INSTANT" across the UI, configuration, and documentation, causing branding inconsistency with the project's official name "MedRetriv".
+* **Root Cause**: Early scaffold files retained the placeholder name "INSTANT".
+* **Change**:
+  * Fully updated `src/UI/app.py`: Streamlit `page_title`, sidebar title, header caption, and error handling now consistently reflect `MedRetriv`.
+  * Updated `pyproject.toml` and `uv.lock` package names from `instant` to `medretriv`.
+  * Updated `README.md` to comprehensively document MedRetriv's 5-document corpus, 4-layer architecture, and Day 4 evaluation benchmark results.
+  * Verified `src/API/main.py` FastAPI title and metadata are unified under `MedRetriv`.
+* **Verification**: Global search across the repository confirms zero remaining user-facing references to legacy branding.
+
 ---
 
 ## 3. Chunk & Corpus Statistics

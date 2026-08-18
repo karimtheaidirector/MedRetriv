@@ -6,7 +6,7 @@ API_URL = "http://127.0.0.1:8000/chat"
 
 
 st.set_page_config(
-    page_title="INSTANT",
+    page_title="MedRetriv",
     page_icon="🩺",
     layout="centered",
 )
@@ -60,7 +60,7 @@ current_chat = st.session_state.chats[
 
 with st.sidebar:
 
-    st.title("INSTANT")
+    st.title("MedRetriv")
     st.caption("Clinical Evidence Assistant")
 
     if st.button(
@@ -89,10 +89,10 @@ with st.sidebar:
 # Main UI
 # ============================================================
 
-st.title("🩺 INSTANT")
+st.title("🩺 MedRetriv")
 st.caption(
     "Clinical Evidence Assistant — "
-    "Breast Cancer Screening"
+    "Breast Cancer Screening & Clinical Knowledge"
 )
 
 
@@ -157,7 +157,7 @@ if question:
             except requests.exceptions.RequestException as e:
 
                 answer = (
-                    "Unable to connect to the INSTANT API.\n\n"
+                    "Unable to connect to the MedRetriv API.\n\n"
                     f"Error: {e}"
                 )
 
