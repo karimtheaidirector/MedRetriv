@@ -21,6 +21,19 @@ def format_citation(metadata: dict) -> str:
         return f"[Source: {source}, {page_str}]"
 
 
+import re
+
+
+def strip_retrieval_hints(text: str) -> str:
+    """
+    Strip system retrieval context prefixes so the LLM and synthesis only receive
+    the genuine clinical document text.
+    """
+    if not text:
+        return ""
+    return re.sub(r"^\[Retrieval context:[^\]]+\]\s*", "", text, flags=re.DOTALL).strip()
+
+
 def build_context(results: dict) -> str:
     """
     Build structured clinical evidence context from retrieval results.
@@ -34,13 +47,14 @@ def build_context(results: dict) -> str:
     for document_id, document, metadata in zip(ids, documents, metadatas):
         citation = format_citation(metadata)
         doc_type = metadata.get("doc_type", metadata.get("document_type", "clinical"))
+        cleaned_doc = strip_retrieval_hints(document)
 
         context_parts.append(
             f"--- Evidence Chunk ({citation}) ---\n"
             f"Chunk ID: {document_id}\n"
             f"Document Type: {doc_type}\n"
             f"Required Citation: {citation}\n"
-            f"Content:\n{document}"
+            f"Content:\n{cleaned_doc}"
         )
 
     return "\n\n---\n\n".join(context_parts)

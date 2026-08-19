@@ -37,21 +37,41 @@ def extract_persistent_topic(history: List[Dict[str, str]]) -> str:
     return "breast cancer"
 
 
+AGE_CONSULTATION_PATTERN = re.compile(
+    r"\b(i am|i\'m|age|aged|\d{1,2}\s*years?\s*old)\b.*?\b(suggest|recommend|advice|advise|should i|do i need|guideline|what should|what to do)\b|"
+    r"\b(suggest|recommend|advice|advise|should i|do i need|what should|what to do)\b.*?\b(i am|i\'m|age|aged|\d{1,2}\s*years?\s*old)\b",
+    re.IGNORECASE
+)
+
+
 def resolve_contextual_query(
     current_query: str,
-    history: List[Dict[str, str]]
+    history: Optional[List[Dict[str, str]]] = None,
 ) -> str:
     """
-    Lightweight persistent context carry-over: If the user provides a short follow-up or
-    topic word (e.g. 'pathogenesis', 'more details', 'treatment'), enrich it with the
-    persistent clinical topic anchor established in the session.
+    Persistent context carry-over and query resolution:
+    1. If the user provides an elliptical age-screening consultation query without explicit
+       domain keywords (e.g. 'I am 75 years old, suggest me'), resolves it with the clinical domain.
+    2. If the user provides a short follow-up or topic word with active history, enrich it with
+       the persistent clinical topic anchor established in the session.
     """
-    if not history or not current_query or not current_query.strip():
+    if not current_query or not current_query.strip():
         return current_query
 
     q_clean = current_query.strip()
-    words = q_clean.split()
     q_lower = q_clean.lower().rstrip("?!.,;:")
+
+    # Check if clinical domain keywords are already present
+    has_domain = any(k in q_lower for k in ["breast", "cancer", "mammogra", "dcis", "tumor", "tumour"])
+
+    # Age consultation without explicit domain keywords (e.g. "I am 75 years old, suggest me")
+    if not has_domain and AGE_CONSULTATION_PATTERN.search(q_clean):
+        return f"{q_clean} breast cancer screening guidelines"
+
+    if not history:
+        return current_query
+
+    words = q_clean.split()
 
     # If the user asks a completely new long standalone question (>= 6 words), do not force-prefix
     if len(words) >= 6:
@@ -66,8 +86,7 @@ def resolve_contextual_query(
         return f"{active_anchor} detailed clinical evidence and comprehensive guidelines"
 
     # Case B: Short noun/topic follow-up (<= 4 words) that doesn't explicitly mention the anchor
-    if len(words) <= 4:
-        if "breast" not in q_lower and "cancer" not in q_lower:
-            return f"{active_anchor} {q_clean}"
+    if len(words) <= 4 and not has_domain:
+        return f"{active_anchor} {q_clean}"
 
     return current_query

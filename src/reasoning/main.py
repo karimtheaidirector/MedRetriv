@@ -9,7 +9,7 @@ from src.logging.query_logger import log_query
 def answer_question(
     question: str,
     history: list = None,
-    n_results: int = 5,
+    n_results: int = 8,
     threshold: float = CONFIDENCE_THRESHOLD,
 ) -> dict:
     """
@@ -43,9 +43,9 @@ def answer_question(
             "query_type": "conversational",
         }
 
-    # 2. Contextual follow-up resolution (enrich short follow-ups with prior turn anchor)
+    # 2. Contextual follow-up and clinical consultation resolution
     from src.reasoning.contextual import resolve_contextual_query
-    resolved_q = resolve_contextual_query(normalized_q, history=history) if history else normalized_q
+    resolved_q = resolve_contextual_query(normalized_q, history=history)
 
     # 3. Retrieve clinical evidence chunks
     results = retrieve_documents(

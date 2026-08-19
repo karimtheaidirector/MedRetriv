@@ -2,7 +2,7 @@ from src.Retrieval.query import retrieve_documents
 from src.Retrieval.context import build_context
 
 
-def retrieve_context(query: str, n_results=3):
+def retrieve_context(query: str, n_results=8):
     results = retrieve_documents(
         query,
         n_results=n_results,

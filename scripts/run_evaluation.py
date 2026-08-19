@@ -255,7 +255,7 @@ for item in BENCHMARK_QUESTIONS:
     t_start = time.perf_counter()
 
     # 1. Retrieval step (measures embedding + ChromaDB query)
-    raw_results = retrieve_documents(question, n_results=5)
+    raw_results = retrieve_documents(question, n_results=8)
     retrieval_time_ms = (time.perf_counter() - t_start) * 1000
 
     # 2. Safety evaluation

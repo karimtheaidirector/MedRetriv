@@ -8,6 +8,9 @@ EMBEDDED_DOCUMENTS_PATH = (
 )
 
 
+from src.embeddings.generator import get_enriched_chunk_text
+
+
 def build_embedded_documents(chunks, embeddings):
     """
     Combine chunks with their generated embeddings.
@@ -31,7 +34,7 @@ def build_embedded_documents(chunks, embeddings):
                 "section": chunk.get("section", "unknown"),
                 "page_start": chunk.get("page_start", 0),
                 "page_end": chunk.get("page_end", 0),
-                "text": chunk["text"],
+                "text": get_enriched_chunk_text(chunk),
                 "embedding": embedding,
             }
         )

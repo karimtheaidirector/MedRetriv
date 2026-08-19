@@ -104,13 +104,14 @@ def _synthesize_grounded_response(prompt: str) -> str:
             if len(s.strip()) > 35
         ]
 
-        # Filter out web navigation, news list headers, and table headers
+        # Filter out web navigation, news list headers, table headers, and retrieval context prefixes
         meaningful_sentences = []
         for s in raw_sentences:
             s_lower = s.lower()
             if any(noise in s_lower for noise in [
                 "latest news articles", "on this page", "enlarge image",
-                "credit:", "table of contents", "doi:", "http://", "https://"
+                "credit:", "table of contents", "doi:", "http://", "https://",
+                "[retrieval context:", "retrieval context:"
             ]):
                 continue
             cleaned = _clean_evidence_sentence(s)

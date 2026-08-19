@@ -63,14 +63,14 @@ def chat(request: ChatRequest):
             "query_type": "conversational",
         }
 
-    # 2. Contextual follow-up resolution
+    # 2. Contextual follow-up and clinical consultation resolution
     from src.reasoning.contextual import resolve_contextual_query
-    resolved_q = resolve_contextual_query(normalized_q, history=history_dicts) if history_dicts else normalized_q
+    resolved_q = resolve_contextual_query(normalized_q, history=history_dicts)
 
     # 3. Retrieve relevant clinical evidence
     results = retrieve_documents(
         resolved_q,
-        n_results=5,
+        n_results=8,
     )
 
     # 2. Evaluate retrieval safety & confidence threshold
