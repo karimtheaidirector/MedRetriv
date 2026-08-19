@@ -135,38 +135,19 @@ def get_theme_css(is_dark: bool) -> str:
         }
 
         /* Chat Messages */
-        .chat-row-user {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 1rem;
+        div[data-testid="stChatMessage"] {
+            background-color: #1e293b !important;
+            border: 1px solid #334155 !important;
+            border-radius: 12px !important;
+            margin-bottom: 0.85rem !important;
+            padding: 0.85rem 1.1rem !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
         }
-        .chat-bubble-user {
-            background: #0f766e;
-            color: #ffffff !important;
-            padding: 0.75rem 1.15rem;
-            border-radius: 16px 16px 4px 16px;
-            max-width: 80%;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-            font-size: 0.95rem;
-            line-height: 1.5;
-            border: 1px solid #14b8a6;
-        }
-
-        .chat-row-assistant {
-            display: flex;
-            justify-content: flex-start;
-            margin-bottom: 1.2rem;
-        }
-        .chat-card-assistant {
-            background: #1e293b;
-            border: 1px solid #334155;
-            border-radius: 14px;
-            padding: 1.1rem 1.25rem;
-            max-width: 92%;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+        div[data-testid="stChatMessage"] p,
+        div[data-testid="stChatMessage"] li {
+            color: #f1f5f9 !important;
             font-size: 0.95rem;
             line-height: 1.6;
-            color: #f1f5f9 !important;
         }
 
         /* Refusal Card (High Contrast Dark Mode) */
@@ -377,37 +358,19 @@ def get_theme_css(is_dark: bool) -> str:
         }
 
         /* Chat Messages */
-        .chat-row-user {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 1rem;
+        div[data-testid="stChatMessage"] {
+            background-color: #ffffff !important;
+            border: 1px solid #e2e8f0 !important;
+            border-radius: 12px !important;
+            margin-bottom: 0.85rem !important;
+            padding: 0.85rem 1.1rem !important;
+            box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04) !important;
         }
-        .chat-bubble-user {
-            background: #0f766e;
-            color: #ffffff !important;
-            padding: 0.75rem 1.15rem;
-            border-radius: 16px 16px 4px 16px;
-            max-width: 80%;
-            box-shadow: 0 2px 5px rgba(15, 118, 110, 0.18);
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-
-        .chat-row-assistant {
-            display: flex;
-            justify-content: flex-start;
-            margin-bottom: 1.2rem;
-        }
-        .chat-card-assistant {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 1.1rem 1.25rem;
-            max-width: 92%;
-            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+        div[data-testid="stChatMessage"] p,
+        div[data-testid="stChatMessage"] li {
+            color: #0f172a !important;
             font-size: 0.95rem;
             line-height: 1.6;
-            color: #1e293b !important;
         }
 
         /* Refusal Card (Light Mode) */
@@ -530,7 +493,7 @@ def get_theme_css(is_dark: bool) -> str:
 # ============================================================
 
 CITATION_REGEX = re.compile(
-    r"\[Source:\s*([^,\]]+)(?:,\s*Section:\s*([^,\]]+))?,\s*Page:\s*([^\]]+)\]"
+    r"\[Source:\s*(.*?)(?:,\s*Section:\s*(.*?))?,\s*Page:\s*([^\]]+)\]"
 )
 
 DOC_FRIENDLY_NAMES = {
@@ -728,87 +691,67 @@ for msg in current_chat["messages"]:
     query_type = msg.get("query_type", "clinical")
 
     if role == "user":
-        st.markdown(
-            f"""
-            <div class="chat-row-user">
-                <div class="chat-bubble-user">
-                    {html.escape(content)}
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+        with st.chat_message("user", avatar="👤"):
+            st.markdown(content)
     else:
-        # Assistant Message
-        if refused:
-            st.markdown(
-                f"""
-                <div class="chat-card-refusal">
-                    <div class="refusal-badge">⚠️ Insufficient Evidence / Out of Scope</div>
-                    <div class="refusal-text">{html.escape(content)}</div>
-                    <div class="refusal-caption">
-                        Similarity score ({top_score:.3f}) was below the safety threshold (0.50). Pre-generation gating prevented hallucination.
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-        else:
-            conf_html = ""
-            if query_type != "conversational" and top_score > 0.0:
-                if top_score >= 0.65:
-                    conf_html = f'<div class="confidence-tag conf-high">🟢 High confidence match ({top_score:.2f})</div>'
-                else:
-                    conf_html = f'<div class="confidence-tag conf-mod">🟡 Moderate confidence match ({top_score:.2f})</div>'
-
-            citation_html = ""
-            if citations:
-                badges_str = "".join(
-                    f'<span class="citation-badge">📄 {html.escape(b)}</span>'
-                    for b in citations
+        with st.chat_message("assistant", avatar="🩺"):
+            if refused:
+                refusal_card_html = (
+                    f'<div class="chat-card-refusal">'
+                    f'<div class="refusal-badge">⚠️ Insufficient Evidence / Out of Scope</div>'
+                    f'<div class="refusal-text">{html.escape(content)}</div>'
+                    f'<div class="refusal-caption">'
+                    f'Similarity score ({top_score:.3f}) was below the safety threshold (0.50). Pre-generation gating prevented hallucination.'
+                    f'</div></div>'
                 )
-                citation_html = f"""
-                <div class="citation-container">
-                    <span class="citation-label">Sources:</span>
-                    {badges_str}
-                </div>
-                """
+                st.markdown(refusal_card_html, unsafe_allow_html=True)
+            else:
+                if query_type != "conversational" and top_score > 0.0:
+                    if top_score >= 0.65:
+                        conf_html = f'<div class="confidence-tag conf-high">🟢 High confidence match ({top_score:.2f})</div>'
+                    else:
+                        conf_html = f'<div class="confidence-tag conf-mod">🟡 Moderate confidence match ({top_score:.2f})</div>'
+                    st.markdown(conf_html, unsafe_allow_html=True)
 
-            st.markdown(
-                f"""
-                <div class="chat-card-assistant">
-                    <div>{html.escape(content)}</div>
-                    {conf_html}
-                    {citation_html}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+                # Render main answer text as Markdown (bold, lists, headings parsed natively)
+                st.markdown(content)
 
-            # Expandable evidence panel (only if chunks were retrieved)
-            if chunks and query_type != "conversational":
-                with st.expander(f"🔍 View Evidence Used ({len(chunks)} Chunks)", expanded=False):
-                    for idx, ch in enumerate(chunks):
-                        src = DOC_FRIENDLY_NAMES.get(ch.get("document", ""), ch.get("document", "Document"))
-                        sec = ch.get("section", "General")
-                        p_start = ch.get("page_start", "?")
-                        p_end = ch.get("page_end", "?")
-                        p_str = f"p.{p_start}" if p_start == p_end else f"p.{p_start}-{p_end}"
-                        score = ch.get("similarity_score", 0.0)
-                        text_prev = ch.get("text", "")[:220].strip()
+                # Render citation badges as separate HTML
+                if citations:
+                    badges_str = "".join(
+                        f'<span class="citation-badge">📄 {html.escape(b)}</span>'
+                        for b in citations
+                    )
+                    citation_html = (
+                        f'<div class="citation-container">'
+                        f'<span class="citation-label">Sources:</span>'
+                        f'{badges_str}'
+                        f'</div>'
+                    )
+                    st.markdown(citation_html, unsafe_allow_html=True)
 
-                        st.markdown(
-                            f"""
-                            <div class="evidence-item">
-                                <div class="evidence-meta">
-                                    <span><b>#{idx+1} {html.escape(src)}</b> ({html.escape(sec)}, {p_str})</span>
-                                    <span style="color:#38bdf8;">Match: {score:.3f}</span>
-                                </div>
-                                <div class="evidence-preview">{html.escape(text_prev)}...</div>
-                            </div>
-                            """,
-                            unsafe_allow_html=True,
-                        )
+                # Expandable evidence panel (only if chunks were retrieved)
+                if chunks and query_type != "conversational":
+                    with st.expander(f"🔍 View Evidence Used ({len(chunks)} Chunks)", expanded=False):
+                        for idx, ch in enumerate(chunks):
+                            src = DOC_FRIENDLY_NAMES.get(ch.get("document", ""), ch.get("document", "Document"))
+                            sec = ch.get("section", "General")
+                            p_start = ch.get("page_start", "?")
+                            p_end = ch.get("page_end", "?")
+                            p_str = f"p.{p_start}" if p_start == p_end else f"p.{p_start}-{p_end}"
+                            score = ch.get("similarity_score", 0.0)
+                            text_prev = ch.get("text", "")[:220].strip()
+
+                            item_html = (
+                                f'<div class="evidence-item">'
+                                f'<div class="evidence-meta">'
+                                f'<span><b>#{idx+1} {html.escape(src)}</b> ({html.escape(sec)}, {p_str})</span>'
+                                f'<span style="color:#38bdf8;">Match: {score:.3f}</span>'
+                                f'</div>'
+                                f'<div class="evidence-preview">{html.escape(text_prev)}...</div>'
+                                f'</div>'
+                            )
+                            st.markdown(item_html, unsafe_allow_html=True)
 
 
 # ============================================================
