@@ -191,6 +191,77 @@
 
 ---
 
+### Issue 15: Greeting Detection Regression on Elongated Casual Spelling
+* **Discovered**: Day 4 — Casual user greetings such as `"Hellooooo"` and `"hiiii"` fell through to the clinical retrieval/refusal pipeline with a low-similarity refusal card rather than returning the friendly assistant greeting.
+* **Root Cause**: In `src/reasoning/main.py` and `src/API/main.py`, `detect_conversational_query()` was executed at Step 0 *before* `normalize_query()`. Because `GREETING_PATTERNS` used word-boundary regexes (`^hi\b`, `^hello\b`), elongated strings failed exact pattern matching and were routed to dense retrieval where `"hellooooo"` scored a low cosine similarity ($< 0.30$) against clinical guidelines.
+* **Change**:
+  * Moved `normalize_query()` to the very top of `answer_question()` and FastAPI `/chat` as **Step 0**.
+  * The regex de-elongation rule `re.sub(r'(\w)\1{2,}', r'\1', text)` collapses 3+ repeated characters down to 1 (`"Hellooooo"` $\rightarrow$ `"Hello"`, `"hiiii"` $\rightarrow$ `"hi"`) before conversational intent matching.
+* **Verification**: Verified in `scratch/test_norm_conv.py` — `"Hellooooo"` and `"hiiii"` both evaluate to `intent: "greeting"` with `query_type: "conversational"` and return the friendly assistant introduction without invoking vector retrieval.
+
+---
+
+### Issue 16: Conversational Intent Expansion & Repeat Greeting Polishing
+* **Discovered**: Day 4 — Casual acknowledgments like `"okaayyyy"`, `"sure"`, `"got it"` and assistant metadata queries like `"what is your name"`, `"who made you"` were not recognized by `detect_conversational_query()` and fell through to clinical retrieval. Additionally, repeated greetings in the same session returned verbatim identical responses.
+* **Root Cause**: `COURTESY_PATTERNS` and `META_IDENTITY_PATTERNS` in `src/reasoning/conversational.py` lacked coverage for common casual courtesy keywords, while greeting responses were static strings with no session awareness.
+* **Change**:
+  * Expanded `COURTESY_PATTERNS` with `ok`, `okay`, `sure`, `got it`, `alright`, `all good`, `sounds good`, `cool`, `awesome`, `nice` and mapped typographical variations (`okaay`, `okkay`, `alrightt`) in `CLINICAL_TYPO_MAP`.
+  * Expanded `META_IDENTITY_PATTERNS` to include `"what is your name"`, `"what's your name"`, `"who made you"`, `"who created you"`.
+  * Added `history` parameter support in `detect_conversational_query()`; if a user triggers a greeting again in an active consultation session, MedRetriv returns a shorter greeting variation: *"Hi again! What clinical questions or breast cancer screening guidelines can I help you with?"*.
+  * Updated courtesy response to: *"Glad that helps! Let me know if you have another clinical question."*.
+* **Verification**: Tested in `scratch/test_followup_and_courtesy.py` — `"okaayyyy"` cleanly routes to courtesy acknowledgment; `"what is your name"` cleanly routes to assistant identity; repeated greetings return the contextual variant.
+
+---
+
+### Issue 17: Persistent Topic Contextual Carry-Over for Multi-Turn Follow-Ups
+* **Discovered**: Day 4 — Short multi-turn follow-up queries (e.g. Turn 1: `"what is breast cancer"`, Turn 2: `"types"`, Turn 3: `"pathogensis"`, Turn 4: `"treatment"`) broke at Turn 3 and 4, scoring below the $0.50$ confidence threshold (0.310 and 0.336) and triggering false refusals.
+* **Root Cause**:
+  1. Contextual query resolution in `src/reasoning/contextual.py` only inspected the immediate preceding user message ($N-1$ hop). When message 2 was `"types"`, message 3 (`"pathogensis"`) tried to anchor to `"types"` rather than the persistent topic `"breast cancer"`.
+  2. Domain typographical near-miss `"pathogensis"` (missing the middle 'e') was missing from `CLINICAL_TYPO_MAP`, preventing vector similarity matching before anchoring.
+* **Change**:
+  * Created `extract_persistent_topic(history)` in `src/reasoning/contextual.py` which scans the entire consultation history to maintain a session-level **active clinical topic anchor** (`"breast cancer"`, `"screening mammography"`, `"ductal carcinoma in situ DCIS"`, etc.) across multiple follow-up turns.
+  * Added near-miss typographical mappings in `src/reasoning/normalizer.py` for `pathogensis`, `treatmnt`, `diagnosiss`, `prognossis`, `biomarkerss`, `subtyps`, `mammografy`, `chemotherpy`, `radiotherapy`.
+  * Ensured `normalize_query()` executes prior to contextual resolution so typos are healed before query enrichment.
+* **Verification**: Verified the full 4-turn sequence in `scratch/test_multi_turn_sequence.py` — Turn 1 (0.758), Turn 2 (0.781), Turn 3 (0.727), and Turn 4 (0.716) all scored $\ge 0.716$ (safely above 0.50) with 0 refusals and exact multi-document evidence grounding.
+
+---
+
+### Issue 18: Streamlit UI/UX Visual Redesign & Dual-Theme Architecture
+* **Discovered**: Day 4 — The initial UI layout used generic Streamlit chat containers, inline raw citation brackets `[Source: ...]` embedded inside prose, no visual evidence breakdown, and lacked theme control.
+* **Root Cause**: Need for a polished, demo-ready clinical decision support interface with clean separation between readable clinical prose, verifiable citation badges, and underlying evidence chunks.
+* **Change**:
+  * **Chat Message Containers**: User messages styled as right-aligned teal bubbles (`#0f766e`); assistant messages styled as elevated card containers with soft drop shadows and rounded corners.
+  * **Citation Badge Row**: Implemented `parse_and_clean_answer()` regex parsing to strip raw brackets from text while extracting clean, deduplicated pill badges below prose (e.g. `📄 USPSTF Guideline · p.10`).
+  * **"View Evidence Used" Expandable Panel**: Added a collapsed expander below each answer detailing document name, section, page range, exact cosine similarity score, and a 200-character text snippet for every retrieved chunk.
+  * **Confidence Badges**: Added visual confidence indicators (`🟢 High confidence match (Score)` $\ge 0.65$, `🟡 Moderate confidence match (Score)` $< 0.65$).
+  * **Distinct Safety Refusal Styling**: Muted amber/slate card with an amber left border and `⚠️ Insufficient Evidence / Out of Scope` badge explaining the pre-generation cutoff.
+  * **Display Theme Switcher**: Added an interactive `🌙 Dark Mode` / `☀️ Light Mode` radio toggle in the sidebar with session-state persistence.
+* **Verification**: Verified UI rendering in `src/UI/app.py` across conversational, clinical, and refusal message states.
+
+---
+
+### Issue 19: Dark Mode Refusal Card Contrast & Legibility Fix
+* **Discovered**: Day 4 — In Dark Mode, the "Insufficient Evidence / Out of Scope" refusal card rendered body text in a dark amber/brown tone against a dark brown card background, making the message nearly illegible.
+* **Root Cause**: In `get_theme_css(is_dark=True)`, `.chat-card-refusal` used `#271a0c` background with `#fde68a` text inherited across nested divs, but lacked explicit contrast-tested styling for the primary message content and gating explanation.
+* **Change**:
+  * Set card container to dark neutral `#1c1917` with subtle `#443722` border and `#f59e0b` amber left accent.
+  * Assigned crisp off-white (`#f8fafc`, `font-size: 0.95rem`, `line-height: 1.55`) to `.refusal-text` for maximum legibility.
+  * Assigned bright golden amber (`#fcd34d`, `font-size: 0.80rem`, `font-style: italic`) to `.refusal-caption` for the similarity score explanation.
+* **Verification**: Visual contrast audited in dark mode CSS — text is crisply legible with high contrast against the dark background.
+
+---
+
+### Issue 20: Streamlit Native Header & Chat Input Box Theme Consistency
+* **Discovered**: Day 4 — In both dark and light modes, Streamlit's native top header toolbar and bottom chat input area retained default gray/white backgrounds, creating visible, jarring horizontal stripes that clashed with the custom theme canvas.
+* **Root Cause**: Custom CSS styled `.stApp` and custom cards but did not override Streamlit's native `stHeader`, `stToolbar`, `stBottom`, `stBottomBlockContainer`, and `stChatInput` component wrapper selectors.
+* **Change**:
+  * Targeted `header[data-testid="stHeader"]`, `.stAppHeader`, `.stAppToolbar`, `div[data-testid="stToolbar"]` to match the canvas background (Dark: `#0f172a`, Light: `#f8fafc`).
+  * Targeted `div[data-testid="stBottom"]`, `div[data-testid="stBottomBlockContainer"]`, `footer` to seamlessly blend into the canvas with subtle divider borders.
+  * Styled `div[data-testid="stChatInput"] > div` as an elevated container (Dark: `#1e293b` with `#334155` border, Light: `#ffffff` with `#cbd5e1` border) with custom placeholder and icon accent colors.
+* **Verification**: Full page visually unified with zero default Streamlit chrome leaking at the top or bottom of the screen.
+
+---
+
 ## 3. Chunk & Corpus Statistics
 
 ### Document Breakdown & Section Counts
@@ -286,6 +357,12 @@ A benchmark evaluation suite of **24 standardized clinical and out-of-domain que
 | **Unique Chunks Surfaced** | **89 / 515 (17.3%)** | Balanced coverage across 24 benchmark queries | ✅ PASSED |
 | **Retrieval Latency by Category** | **Out-of-Domain: ~19 ms \| Screening: ~19–23 ms \| General Definitional: ~44–97 ms** | Varies with retrieval breadth and model warm-up state | ✅ PASSED |
 | **Total Query Latency by Category** | **Out-of-Domain: ~19 ms \| Screening: ~20–23 ms \| General Definitional: ~45–98 ms** | Includes safety check & synthesis ($< 100\text{ ms}$ real-time) | ✅ PASSED |
+
+> [!NOTE]
+> **Benchmark Execution Mode Transparency (Offline Synthesis vs Live LLM API)**:  
+> The automated benchmark suite (`scripts/run_evaluation.py` and `notebooks/evaluation_report.ipynb`) was evaluated in an unauthenticated environment where `HF_TOKEN` was not populated, executing generation via MedRetriv's **Grounded Evidence Synthesis engine**.  
+> * **Model-Independent Metrics**: **Retrieval Precision @ 3 & @ 5 (89.5%)**, **Refusal Recall (100.0%)**, **Refusal Precision (100.0%)**, **Cosine Similarity Margins**, and **Retrieval Latencies (~19–44 ms)** operate purely on dense vector similarity and ChromaDB indexing; these metrics are 100% invariant to the generation engine.  
+> * **Generation-Dependent Metrics**: **Citation Compliance (100.0%)** and **Citation Accuracy (100.0%)** are enforced by deterministic evidence block binding in offline mode, and by the strict verbatim citation prompt instructions (`src/reasoning/prompt.py`) coupled with programmatic post-generation verification (`verify_citations()` in `src/reasoning/safety.py`) in live LLM mode.
 
 ### Latency Variance Investigation
 
