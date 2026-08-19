@@ -234,21 +234,23 @@ DOCUMENT_CONFIGS = {
     "NCINIH": DocumentConfig(
         doc_type="patient_guide",
         heading_patterns=[
-            r"^What Is Breast Cancer\??$",
+            r"^What Is Breast Cancer\??\s*$",
             r"^Types of Breast Cancer\s*$",
-            r"^Breast Cancer Causes and Risk Factors",
+            r"^Molecular subtypes of breast cancer\s*$",
+            r"^Breast Cancer Causes and Risk Factors\s*$",
+            r"^Personal health history and breast conditions\s*$",
+            r"^Reproductive history\s*$",
+            r"^Genetics and family history\s*$",
+            r"^Lifestyle factors\s*$",
             r"^Breast Cancer Screening\s*$",
             r"^Breast Cancer Stages\s*$",
             r"^Breast Cancer Treatment\s*$",
             r"^Breast Cancer Research\s*$",
-            r"^Breast Cancer Clinical Trials",
-            r"^Breast Cancer Research Results",
-            r"^Breast Cancer Survivorship",
-            r"^Molecular subtypes",
-            r"^Personal health history",
-            r"^Reproductive history\s*$",
-            r"^Genetics and family history",
-            r"^Lifestyle factors\s*$",
+            r"^Breast Cancer Clinical Trials\s*$",
+            r"^Breast Cancer Research Results\s*$",
+            r"^Breast Cancer Survivorship\s*$",
+            r"^Types of breast lumps in children\s*$",
+            r"^Causes and risk factors for breast lumps in children\s*$",
         ],
         header_patterns=[],
         footer_patterns=[],
@@ -257,6 +259,7 @@ DOCUMENT_CONFIGS = {
             r"^Credit:\s*.+$",
             r"^On This Page\s*$",
             r"^Enlarge Image\s*$",
+            r"^Latest news articles\b.*$",
         ],
     ),
 }
@@ -289,7 +292,14 @@ def _detect_heading_line(
 
     stripped = line_text.strip()
 
-    if not stripped or len(stripped) > 150:
+    if not stripped or len(stripped) > 120:
+        return None
+
+    # Guard: Running sentences with trailing punctuation or conjunctions are not headings
+    if stripped.endswith(",") or stripped.endswith(";") or stripped.endswith("..."):
+        return None
+
+    if stripped.endswith(".") and len(stripped.split()) > 7:
         return None
 
     for pattern in config.heading_patterns:

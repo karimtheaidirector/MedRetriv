@@ -8,6 +8,7 @@ from src.logging.query_logger import log_query
 
 def answer_question(
     question: str,
+    history: list = None,
     n_results: int = 5,
     threshold: float = CONFIDENCE_THRESHOLD,
 ) -> dict:
@@ -15,9 +16,13 @@ def answer_question(
     Retrieve clinical evidence, apply pre-generation safety threshold,
     generate a citation-grounded answer, and log the full query end-to-end.
     """
-    # 0. Check for conversational greetings, courtesy, or meta-assistant questions
+    # 0. Normalize query typos (mitigate repeated characters, casual spelling, keyboard slips)
+    from src.reasoning.normalizer import normalize_query
+    normalized_q = normalize_query(question)
+
+    # 1. Check for conversational greetings, courtesy, or meta-assistant questions
     from src.reasoning.conversational import detect_conversational_query
-    conv = detect_conversational_query(question)
+    conv = detect_conversational_query(normalized_q, history=history)
     if conv:
         log_query(
             question=question,
@@ -26,7 +31,7 @@ def answer_question(
             top_score=1.0,
             final_answer=conv["response"],
             refused=False,
-            extra_metadata={"query_type": "conversational", "intent": conv["intent"]},
+            extra_metadata={"query_type": "conversational", "intent": conv["intent"], "normalized_query": normalized_q},
         )
         return {
             "question": question,
@@ -38,9 +43,13 @@ def answer_question(
             "query_type": "conversational",
         }
 
-    # 1. Retrieve clinical evidence chunks
+    # 2. Contextual follow-up resolution (enrich short follow-ups with prior turn anchor)
+    from src.reasoning.contextual import resolve_contextual_query
+    resolved_q = resolve_contextual_query(normalized_q, history=history) if history else normalized_q
+
+    # 3. Retrieve clinical evidence chunks
     results = retrieve_documents(
-        question,
+        resolved_q,
         n_results=n_results,
     )
 

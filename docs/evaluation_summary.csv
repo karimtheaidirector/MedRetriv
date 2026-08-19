@@ -10,6 +10,6 @@ Refusal Precision (No False Refusals),100.0%,100.0% (0 false refusals on in-doma
 In-Domain Top-1 Similarity (Mean ± Std),0.732 ± 0.065,"Range: [0.574, 0.818] (Well above threshold 0.50)"
 Out-of-Domain Top-1 Similarity (Mean ± Std),0.271 ± 0.029,"Range: [0.221, 0.308] (Well below threshold 0.50)"
 Confidence Safety Separation Margin,0.266,> 0.35 safety delta separating in vs out-of-domain
-Unique Chunks Retrieved,87 / 523,16.6% corpus coverage across 24 test queries
-Average Retrieval Latency,28.5 ms,p95 = 21.6 ms (Real-time ChromaDB query)
-Average Total Query Latency,29.0 ms,p95 = 22.0 ms (Includes safety check & generation)
+Unique Chunks Retrieved,88 / 515,17.1% corpus coverage across 24 test queries
+Average Retrieval Latency,32.4 ms,p95 = 31.3 ms (Real-time ChromaDB query)
+Average Total Query Latency,33.4 ms,p95 = 31.4 ms (Includes safety check & generation)

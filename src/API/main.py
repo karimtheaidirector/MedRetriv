@@ -28,9 +28,15 @@ class ChatRequest(BaseModel):
 
 @app.post("/chat")
 def chat(request: ChatRequest):
-    # 0. Check for conversational greetings, courtesy, or meta-assistant questions
+    history_dicts = [{"role": m.role, "content": m.content} for m in request.history]
+
+    # 0. Normalize query typos (mitigate repeated chars, casual spelling, keyboard slips)
+    from src.reasoning.normalizer import normalize_query
+    normalized_q = normalize_query(request.question)
+
+    # 1. Check for conversational greetings, courtesy, or meta-assistant questions
     from src.reasoning.conversational import detect_conversational_query
-    conv = detect_conversational_query(request.question)
+    conv = detect_conversational_query(normalized_q, history=history_dicts)
     if conv:
         log_query(
             question=request.question,
@@ -43,6 +49,7 @@ def chat(request: ChatRequest):
                 "source": "api_chat",
                 "query_type": "conversational",
                 "intent": conv["intent"],
+                "normalized_query": normalized_q,
             },
         )
         return {
@@ -56,9 +63,13 @@ def chat(request: ChatRequest):
             "query_type": "conversational",
         }
 
-    # 1. Retrieve relevant clinical evidence
+    # 2. Contextual follow-up resolution
+    from src.reasoning.contextual import resolve_contextual_query
+    resolved_q = resolve_contextual_query(normalized_q, history=history_dicts) if history_dicts else normalized_q
+
+    # 3. Retrieve relevant clinical evidence
     results = retrieve_documents(
-        request.question,
+        resolved_q,
         n_results=5,
     )
 

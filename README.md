@@ -6,7 +6,7 @@ MedRetriv is an AI Clinical Decision Support (CDS) Retrieval-Augmented Generatio
 
 ## Key Capabilities & Highlights
 
-* **5-Document Authoritative Corpus**: Covers both screening policy/trials and foundational disease definitions across 387 total pages (523 section-aware chunks).
+* **5-Document Authoritative Corpus**: Covers both screening policy/trials and foundational disease definitions across 387 total pages (515 section-aware chunks).
 * **Hard Citation Enforcement**: Every factual claim is bound to an exact inline citation `[Source: <filename>, Section: <section>, Page: <page>]`.
 * **Pre-Generation Safety Gating**: Zero-hallucination defense using a cosine similarity threshold (`CONFIDENCE_THRESHOLD = 0.50`) that intercepts out-of-domain queries before calling the LLM.
 * **Post-Generation Citation Verification**: Programmatic audit step checking every generated citation against retrieved context.
@@ -45,7 +45,7 @@ Evaluated across a standardized 24-question benchmark suite spanning general def
                              Ingestion Layer (Loader ──► Cleaner ──► Chunker)
                                                     │
                                                     ▼
-                                            chunks.json (523 Chunks)
+                                            chunks.json (515 Chunks)
                                                     │
                                                     ▼
                              Embeddings (all-MiniLM-L6-v2, 384d Normalized)
@@ -171,10 +171,10 @@ MedRetriv/
 │   └── retrieval_spot_check_report.md
 │
 ├── data/
-│   ├── chroma/                                 # Active ChromaDB vector store (523 chunks)
+│   ├── chroma/                                 # Active ChromaDB vector store (515 chunks)
 │   ├── processed/
-│   │   ├── chunks.json                         # 523 structured clinical chunks
-│   │   └── embedded_documents.json             # 523 precomputed vector embeddings
+│   │   ├── chunks.json                         # 515 structured clinical chunks
+│   │   └── embedded_documents.json             # 515 precomputed vector embeddings
 │   └── raw/                                    # Exact 5-document authoritative corpus
 │
 ├── docs/
