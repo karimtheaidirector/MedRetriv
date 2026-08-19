@@ -647,3 +647,224 @@ fig.savefig(FIGURES_DIR / "07_response_latency.png")
 plt.close(fig)
 
 print("All 7 PNG figures generated and exported to docs/figures/")
+
+# =============================================================
+# Section 8 — Robustness Evaluation (Query Enhancer / Autocorrect)
+# =============================================================
+# For each typo variant:
+#   1. Normalise → Enhance → Retrieve → measure Top-1 similarity
+#   2. Also retrieve the clean version directly (no enhancer) for delta
+#   3. Record correction metadata and latency
+# =============================================================
+
+print("\n" + "=" * 65)
+print("Section 8  —  Robustness / Query Enhancer Evaluation")
+print("=" * 65)
+
+from src.reasoning.normalizer import normalize_query
+from src.reasoning.query_enhancer import enhance_query
+
+# (source_id, clean_query, typo_query, expected_correction)
+ROBUSTNESS_CASES = [
+    # Single char missing / transposed
+    ("ROB_01", "What are the symptoms of breast cancer?",
+     "What are the symptons of breast cancer?", "symptons→symptoms"),
+    ("ROB_02", "What is the pathogenesis of breast cancer?",
+     "What is the pathogensis of breast cancer?", "pathogensis→pathogenesis"),
+    ("ROB_03", "What is the diagnosis of breast cancer?",
+     "What is the diagnosiss of breast cancer?", "diagnosiss→diagnosis"),
+    ("ROB_04", "What is mammography screening?",
+     "What is mammografy screening?", "mammografy→mammography"),
+    ("ROB_05", "What is chemotherapy for breast cancer?",
+     "What is chemotherpy for breast cancer?", "chemotherpy→chemotherapy"),
+    # Missing chars
+    ("ROB_06", "What are the treatment options for breast cancer?",
+     "What are the treatmnt options for breast cancer?", "treatmnt→treatment"),
+    ("ROB_07", "What are the subtypes of breast cancer?",
+     "What are the subtyps of breast cancer?", "subtyps→subtypes"),
+    ("ROB_08", "What is the prognosis for breast cancer?",
+     "What is the prognossis for breast cancer?", "prognossis→prognosis"),
+    ("ROB_09", "What is tomosynthesis?",
+     "What is tomosynthsis?", "tomosynthsis→tomosynthesis"),
+    ("ROB_10", "What is metastasis in breast cancer?",
+     "What is metastis in breast cancer?", "metastis→metastasis"),
+    # Transpositions
+    ("ROB_11", "What are the types of breast cancer?",
+     "What are the typse of brest cancer?", "typse→types, brest→breast"),
+    # Multi-word typos
+    ("ROB_12", "What are the signs and symptoms of breast cancer?",
+     "What are the sings and symptons of brest cancer?", "sings→signs, symptons→symptoms, brest→breast"),
+    ("ROB_13", "What is the screening mammography guideline?",
+     "What is the screning mammografy guideline?", "screning→screening, mammografy→mammography"),
+    # Repeated chars (post-normalizer form)
+    ("ROB_14", "What are the types of breast cancer?",
+     "what are the types of breast cancer", "clean-after-normalizer"),
+    ("ROB_15", "What are the biomarkers for breast cancer?",
+     "What are the biomarkrs for breast cancer?", "biomarkrs→biomarkers"),
+    # Clinical phrase typos
+    ("ROB_16", "What is the lumpectomy procedure?",
+     "What is the lumpectmy procedure?", "lumpectmy→lumpectomy"),
+    ("ROB_17", "What is mastectomy for breast cancer?",
+     "What is mastectmy for breast cancer?", "mastectmy→mastectomy"),
+    ("ROB_18", "How does dense breast density affect screening?",
+     "How does densee breast densitty affect screenning?",
+     "densee→dense, densitty→density, screenning→screening"),
+    # OOD with typos (must still refuse)
+    ("ROB_OOD_01", None,
+     "What is the first-line treatmnt for a fractured arm?",
+     "OOD — must still refuse after correction"),
+    ("ROB_OOD_02", None,
+     "What are the symptons of COVID-19?",
+     "OOD — must still refuse after correction"),
+]
+
+robustness_results = []
+
+for case in ROBUSTNESS_CASES:
+    rob_id, clean_q, typo_q, expected_fix = case
+    is_ood = rob_id.startswith("ROB_OOD")
+
+    # ── Typo path: normalise → enhance → retrieve ──────────────────
+    t0 = time.perf_counter()
+    norm_typo = normalize_query(typo_q)
+    enh_result = enhance_query(norm_typo)
+    enhanced_q = enh_result.enhanced_query
+
+    raw_enh = retrieve_documents(enhanced_q, n_results=8)
+    enh_latency_ms = (time.perf_counter() - t0) * 1000
+
+    _, top_enh, chunks_enh = evaluate_retrieval_safety(raw_enh, threshold=CONFIDENCE_THRESHOLD)
+
+    # ── Clean path: retrieve without enhancer (baseline delta) ─────
+    if clean_q:
+        raw_clean = retrieve_documents(clean_q, n_results=8)
+        _, top_clean, _ = evaluate_retrieval_safety(raw_clean, threshold=CONFIDENCE_THRESHOLD)
+        sim_delta = round(top_enh - top_clean, 4)
+    else:
+        top_clean = None
+        sim_delta = None
+
+    # ── Pass/fail logic ───────────────────────────────────────────
+    if is_ood:
+        # OOD: must be refused after correction
+        passed_rob = top_enh < CONFIDENCE_THRESHOLD
+        status_str = "PASS (correctly refused)" if passed_rob else f"FAIL (leaked at {top_enh:.3f})"
+    else:
+        # In-domain: must meet threshold after correction
+        passed_rob = top_enh >= CONFIDENCE_THRESHOLD
+        status_str = "PASS" if passed_rob else f"FAIL (top={top_enh:.3f} < {CONFIDENCE_THRESHOLD})"
+
+    icon = "[PASS]" if passed_rob else "[FAIL]"
+    print(f"{icon} {rob_id:14s}  changed={enh_result.query_changed}  "
+          f"top_clean={top_clean if top_clean is not None else 'N/A':>7}  "
+          f"top_enh={top_enh:.3f}  "
+          f"delta={sim_delta if sim_delta is not None else 'N/A':>7}  "
+          f"lat={enh_latency_ms:.1f}ms  |  {expected_fix}")
+
+    robustness_results.append({
+        "id": rob_id,
+        "typo_query": typo_q,
+        "clean_query": clean_q,
+        "enhanced_query": enhanced_q,
+        "query_changed": enh_result.query_changed,
+        "enhancement_confidence": enh_result.enhancement_confidence,
+        "corrections": [
+            {"original": c.original, "corrected": c.corrected,
+             "confidence": c.confidence, "method": c.method}
+            for c in enh_result.corrections
+        ],
+        "top_score_clean": round(float(top_clean), 4) if top_clean is not None else None,
+        "top_score_enhanced": round(float(top_enh), 4),
+        "sim_delta": round(float(sim_delta), 4) if sim_delta is not None else None,
+        "passed": passed_rob,
+        "status": status_str,
+        "is_ood": is_ood,
+        "enhancer_latency_ms": round(enh_latency_ms, 2),
+        "expected_correction": expected_fix,
+    })
+
+# ── Robustness summary stats ──────────────────────────────────────
+rob_df = pd.DataFrame(robustness_results)
+in_domain_rob = rob_df[~rob_df["is_ood"]]
+ood_rob = rob_df[rob_df["is_ood"]]
+
+total_rob    = len(rob_df)
+passed_count = rob_df["passed"].sum()
+failed_count = total_rob - passed_count
+
+mean_delta   = in_domain_rob["sim_delta"].dropna().mean()
+mean_lat_rob = rob_df["enhancer_latency_ms"].mean()
+max_lat_rob  = rob_df["enhancer_latency_ms"].max()
+changed_rate = rob_df["query_changed"].mean() * 100
+
+print(f"\n{'─'*65}")
+print(f"Robustness Results  : {passed_count}/{total_rob} passed, {failed_count}/{total_rob} failed")
+print(f"Mean Similarity Delta (typo→clean): {mean_delta:+.4f}")
+print(f"Changed Rate        : {changed_rate:.0f}% of typo queries were corrected")
+print(f"Enhancer Latency    : avg={mean_lat_rob:.2f}ms  max={max_lat_rob:.2f}ms")
+print(f"{'─'*65}\n")
+
+# ── Figure 8: Similarity delta bar chart (in-domain only) ─────────
+in_dom_plot = in_domain_rob[in_domain_rob["sim_delta"].notna()].copy()
+in_dom_plot = in_dom_plot.sort_values("sim_delta", ascending=True)
+
+fig, ax = plt.subplots(figsize=(11, 5), dpi=300)
+colors = [ACCENT_GREEN if d >= 0 else ACCENT_RED for d in in_dom_plot["sim_delta"]]
+bars = ax.barh(in_dom_plot["id"], in_dom_plot["sim_delta"], color=colors, edgecolor="none")
+ax.axvline(0, color="#475569", linewidth=1.2, linestyle="--")
+
+for bar, val in zip(bars, in_dom_plot["sim_delta"]):
+    ax.text(val + (0.002 if val >= 0 else -0.002), bar.get_y() + bar.get_height() / 2,
+            f"{val:+.4f}", va="center",
+            ha="left" if val >= 0 else "right",
+            fontsize=8.5, fontweight="bold")
+
+ax.set_xlabel("Similarity Delta (enhanced − clean baseline)", fontsize=11, fontweight="bold")
+ax.set_title("Query Enhancer: Top-1 Similarity Delta per Robustness Case\n"
+             "(positive = enhancer improved retrieval; zero = parity with clean)", fontsize=12, fontweight="bold", pad=12)
+ax.tick_params(axis="y", labelsize=9)
+plt.tight_layout()
+fig.savefig(FIGURES_DIR / "08_robustness_similarity_delta.png")
+plt.close(fig)
+
+# ── Figure 9: Clean vs Enhanced similarity side-by-side ───────────
+plot_df = in_dom_plot.dropna(subset=["top_score_clean", "top_score_enhanced"])
+x_idx = range(len(plot_df))
+fig, ax = plt.subplots(figsize=(12, 5), dpi=300)
+width = 0.38
+r1 = ax.bar([i - width/2 for i in x_idx], plot_df["top_score_clean"], width,
+            label="Clean Query (no typo)", color=ACCENT_GRAY, edgecolor="none")
+r2 = ax.bar([i + width/2 for i in x_idx], plot_df["top_score_enhanced"], width,
+            label="Typo Query + Enhancer", color=SECONDARY_COLOR, edgecolor="none")
+
+ax.axhline(CONFIDENCE_THRESHOLD, color=ACCENT_RED, linestyle="--", linewidth=1.8,
+           label=f"Safety Threshold ({CONFIDENCE_THRESHOLD})")
+ax.set_xticks(list(x_idx))
+ax.set_xticklabels(list(plot_df["id"]), rotation=35, ha="right", fontsize=8)
+ax.set_ylabel("Top-1 Cosine Similarity", fontsize=11, fontweight="bold")
+ax.set_title("Robustness: Clean vs. Typo+Enhanced Retrieval Similarity per Case",
+             fontsize=12, fontweight="bold", pad=12)
+ax.set_ylim(0, 1.0)
+ax.legend(frameon=True, facecolor="white", fontsize=9)
+plt.tight_layout()
+fig.savefig(FIGURES_DIR / "09_robustness_clean_vs_enhanced.png")
+plt.close(fig)
+
+print("Figures 8–9 exported to docs/figures/")
+
+# ── Final combined summary ─────────────────────────────────────────
+print("\n" + "=" * 65)
+print("FULL EVALUATION COMPLETE")
+print("=" * 65)
+print(f"  Benchmark queries   : {len(df)}")
+print(f"  Robustness cases    : {total_rob}  ({passed_count} passed, {failed_count} failed)")
+print(f"  Retrieval P@5 (all) : {mean_p5_overall*100:.1f}%")
+print(f"  Refusal recall      : {refusal_recall*100:.0f}%")
+print(f"  Refusal precision   : {refusal_precision*100:.0f}%")
+print(f"  Citation compliance : {citation_compliance_rate*100:.1f}%")
+print(f"  Mean sim delta(rob) : {mean_delta:+.4f}")
+print(f"  Enhancer latency    : avg {mean_lat_rob:.2f}ms")
+print(f"\n  Logs    -> logs/query_log.jsonl")
+print(f"  CSV     -> docs/evaluation_summary.csv")
+print(f"  Figures -> docs/figures/ (09 PNGs)")
+print("=" * 65)

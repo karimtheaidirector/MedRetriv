@@ -34,9 +34,14 @@ def chat(request: ChatRequest):
     from src.reasoning.normalizer import normalize_query
     normalized_q = normalize_query(request.question)
 
+    # 0b. Query Enhancement / Medical Autocorrect
+    from src.reasoning.query_enhancer import enhance_query
+    enhancement = enhance_query(normalized_q)
+    enhanced_q = enhancement.enhanced_query
+
     # 1. Check for conversational greetings, courtesy, or meta-assistant questions
     from src.reasoning.conversational import detect_conversational_query
-    conv = detect_conversational_query(normalized_q, history=history_dicts)
+    conv = detect_conversational_query(enhanced_q, history=history_dicts)
     if conv:
         log_query(
             question=request.question,
@@ -50,6 +55,8 @@ def chat(request: ChatRequest):
                 "query_type": "conversational",
                 "intent": conv["intent"],
                 "normalized_query": normalized_q,
+                "enhanced_query": enhanced_q,
+                "query_changed": enhancement.query_changed,
             },
         )
         return {
@@ -65,7 +72,7 @@ def chat(request: ChatRequest):
 
     # 2. Contextual follow-up and clinical consultation resolution
     from src.reasoning.contextual import resolve_contextual_query
-    resolved_q = resolve_contextual_query(normalized_q, history=history_dicts)
+    resolved_q = resolve_contextual_query(enhanced_q, history=history_dicts)
 
     # 3. Retrieve relevant clinical evidence
     results = retrieve_documents(
@@ -102,6 +109,9 @@ def chat(request: ChatRequest):
             "top_score": top_score,
             "citations": [],
             "retrieved_chunks": chunk_records,
+            "query_changed": enhancement.query_changed,
+            "enhanced_query": enhanced_q if enhancement.query_changed else None,
+            "enhancement_confidence": enhancement.enhancement_confidence,
         }
 
     # 4. Build clinical evidence context with citation tags
@@ -160,6 +170,13 @@ def chat(request: ChatRequest):
         "citation_verification": cit_verification,
         "generation_mode": generation_mode,
         "fallback_triggered": fallback_triggered,
+        "query_changed": enhancement.query_changed,
+        "enhanced_query": enhanced_q if enhancement.query_changed else None,
+        "enhancement_confidence": enhancement.enhancement_confidence,
+        "corrections": [
+            {"original": c.original, "corrected": c.corrected, "confidence": c.confidence, "method": c.method}
+            for c in enhancement.corrections
+        ],
     }
 
 

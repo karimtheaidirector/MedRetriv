@@ -64,6 +64,7 @@ datasets
 # =========================
 scikit-learn
 rank-bm25
+rapidfuzz
 
 # =========================
 # Experimentation / Visualization

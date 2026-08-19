@@ -720,6 +720,8 @@ for msg in current_chat["messages"]:
     top_score = msg.get("top_score", 0.0)
     query_type = msg.get("query_type", "clinical")
     generation_mode = msg.get("generation_mode", "live")
+    query_changed = msg.get("query_changed", False)
+    enhanced_query = msg.get("enhanced_query", None)
 
     if role == "user":
         with st.chat_message("user", avatar="👤"):
@@ -743,6 +745,15 @@ for msg in current_chat["messages"]:
                     else:
                         conf_html = f'<div class="confidence-tag conf-mod">🟡 Moderate confidence match ({top_score:.2f})</div>'
                     st.markdown(conf_html, unsafe_allow_html=True)
+
+                # Subtle correction indicator — shown only when a typo was autocorrected
+                if query_changed and enhanced_query:
+                    st.markdown(
+                        f'<div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px;">'
+                        f'✏️ Query auto-corrected for better retrieval: <em>{html.escape(enhanced_query)}</em>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
 
                 # Render main answer text as Markdown (bold, lists, headings parsed natively)
                 st.markdown(content)
@@ -823,6 +834,8 @@ if current_chat["messages"] and current_chat["messages"][-1]["role"] == "user":
     retrieved_chunks = res.get("retrieved_chunks", [])
     query_type = res.get("query_type", "clinical")
     generation_mode = res.get("generation_mode", "")
+    query_changed = res.get("query_changed", False)
+    enhanced_query = res.get("enhanced_query", None)
 
     if not refused and query_type != "conversational":
         clean_prose, citation_badges = parse_and_clean_answer(raw_answer)
@@ -840,6 +853,8 @@ if current_chat["messages"] and current_chat["messages"][-1]["role"] == "user":
         "retrieved_chunks": retrieved_chunks,
         "query_type": query_type,
         "generation_mode": generation_mode,
+        "query_changed": query_changed,
+        "enhanced_query": enhanced_query,
     })
 
     st.rerun()

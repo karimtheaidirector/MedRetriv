@@ -16,13 +16,18 @@ def answer_question(
     Retrieve clinical evidence, apply pre-generation safety threshold,
     generate a citation-grounded answer, and log the full query end-to-end.
     """
-    # 0. Normalize query typos (mitigate repeated characters, casual spelling, keyboard slips)
+    # 0a. Normalize query typos (mitigate repeated characters, casual spelling, keyboard slips)
     from src.reasoning.normalizer import normalize_query
     normalized_q = normalize_query(question)
 
+    # 0b. Query Enhancement / Medical Autocorrect (fuzzy + dictionary correction before retrieval)
+    from src.reasoning.query_enhancer import enhance_query
+    enhancement = enhance_query(normalized_q)
+    enhanced_q = enhancement.enhanced_query
+
     # 1. Check for conversational greetings, courtesy, or meta-assistant questions
     from src.reasoning.conversational import detect_conversational_query
-    conv = detect_conversational_query(normalized_q, history=history)
+    conv = detect_conversational_query(enhanced_q, history=history)
     if conv:
         log_query(
             question=question,
@@ -31,7 +36,13 @@ def answer_question(
             top_score=1.0,
             final_answer=conv["response"],
             refused=False,
-            extra_metadata={"query_type": "conversational", "intent": conv["intent"], "normalized_query": normalized_q},
+            extra_metadata={
+                "query_type": "conversational",
+                "intent": conv["intent"],
+                "normalized_query": normalized_q,
+                "enhanced_query": enhanced_q,
+                "query_changed": enhancement.query_changed,
+            },
         )
         return {
             "question": question,
@@ -45,7 +56,7 @@ def answer_question(
 
     # 2. Contextual follow-up and clinical consultation resolution
     from src.reasoning.contextual import resolve_contextual_query
-    resolved_q = resolve_contextual_query(normalized_q, history=history)
+    resolved_q = resolve_contextual_query(enhanced_q, history=history)
 
     # 3. Retrieve clinical evidence chunks
     results = retrieve_documents(
@@ -71,6 +82,11 @@ def answer_question(
             top_score=top_score,
             final_answer=final_answer,
             refused=refused,
+            extra_metadata={
+                "enhanced_query": enhanced_q,
+                "query_changed": enhancement.query_changed,
+                "enhancement_confidence": enhancement.enhancement_confidence,
+            },
         )
 
         return {
@@ -80,6 +96,9 @@ def answer_question(
             "confidence_met": False,
             "top_score": top_score,
             "retrieved_chunks": chunk_records,
+            "query_changed": enhancement.query_changed,
+            "enhanced_query": enhanced_q if enhancement.query_changed else None,
+            "enhancement_confidence": enhancement.enhancement_confidence,
         }
 
     # 4. Build evidence context with citation metadata
@@ -115,6 +134,13 @@ def answer_question(
             "flagged_for_review": cit_verification.get("flagged_for_review", False),
             "generation_mode": generation_mode,
             "fallback_triggered": fallback_triggered,
+            "enhanced_query": enhanced_q,
+            "query_changed": enhancement.query_changed,
+            "enhancement_confidence": enhancement.enhancement_confidence,
+            "corrections": [
+                {"original": c.original, "corrected": c.corrected, "confidence": c.confidence, "method": c.method}
+                for c in enhancement.corrections
+            ],
         }
     )
 
@@ -128,6 +154,13 @@ def answer_question(
         "citation_verification": cit_verification,
         "generation_mode": generation_mode,
         "fallback_triggered": fallback_triggered,
+        "query_changed": enhancement.query_changed,
+        "enhanced_query": enhanced_q if enhancement.query_changed else None,
+        "enhancement_confidence": enhancement.enhancement_confidence,
+        "corrections": [
+            {"original": c.original, "corrected": c.corrected, "confidence": c.confidence, "method": c.method}
+            for c in enhancement.corrections
+        ],
     }
 
 

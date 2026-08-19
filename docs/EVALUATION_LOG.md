@@ -424,6 +424,87 @@ Repeated benchmark runs conducted back-to-back with zero code changes revealed i
 
 ---
 
+### Issue 22: Retrieval Gap on Women 75+ USPSTF "I Statement" Content
+* **Discovered**: Live testing surfaced a retrieval gap where queries regarding women aged 75 years or older (e.g., *"What are the recommendations for women aged 75 years or older?"* at 0.480 similarity, and *"I am 75 years old, suggest me"* at 0.259 similarity) were refused, despite the USPSTF PDF explicitly containing the official I statement for this age cohort.
+* **Root Cause**: 
+  1. The 75+ evidence statement was embedded inside a broad, dense recommendation chunk with mixed age ranges (40–74 B recommendation and dense breast I statement), diluting the vector representation for 75+ specific queries.
+  2. Queries mentioning age 75 without explicit "breast cancer" keywords suffered from semantic drift without contextual anchor resolution.
+* **Change**:
+  * Implemented an age consultation contextual resolver in `src/reasoning/contextual.py` detecting age-screening queries (e.g., *"I am 75 years old, suggest me"*) and binding the clinical domain.
+  * Added retrieval-hint metadata prefixing during chunking to anchor USPSTF official statements for older age groups without treating system notes as citable clinical content.
+  * Preserved strict grounding prompt instructions distinguishing retrieval context from evidence text.
+* **Verification**: Verified similarity score for 75+ queries increased from 0.480 to $> 0.650$ (cleanly confident), returning exact USPSTF evidence with 100% verified inline citations.
+
+---
+
+### Issue 23: Intelligent Clinical Query Enhancer / Medical Autocorrect Layer
+* **Discovered**: User queries with random typographical errors (missing characters, swapped characters, repeated characters, or casual spelling like `"symptons"`, `"brest cancer"`, `"pathogensis"`, `"diagnosiss"`, `"mammografy"`, `"chemotherpy"`, `"treatmnt"`) risked degraded cosine similarity or unnecessary safety refusals.
+* **Root Cause**: Pre-retrieval normalization only handled 3+ repeated characters and basic slips, lacking a comprehensive clinical vocabulary lookup and fuzzy edit-distance matching for complex misspellings before embedding generation.
+* **Change**:
+  * Created `src/reasoning/query_enhancer.py` implementing a 4-layer deterministic autocorrect engine:
+    1. **Layer 1 (Repeated Char Collapse)**: Pre-normalised text received from `normalize_query()`.
+    2. **Layer 2 (Extended Clinical Dictionary)**: 200+ direct mappings covering clinical and general terms (`CORRECTION_DICT`).
+    3. **Layer 3 (Fuzzy Matching)**: Fast token-level Levenshtein/WRatio matching via `rapidfuzz` against a curated 135-term `CLINICAL_VOCABULARY` at a high-confidence cutoff ($\ge 87\%$).
+    4. **Layer 4 (Context-Aware Confidence Boost)**: $+5\%$ confidence boost for medical terms when surrounding query tokens contain domain anchors.
+  * Integrated between `normalize_query()` (Step 0a) and `detect_conversational_query()` (Step 1) in both `src/reasoning/main.py` and `src/API/main.py`.
+  * **Safety Invariant**: Preserved `original_query` verbatim for display and logging; only `enhanced_query` is dispatched to retrieval.
+  * Added subtle UI indication in `src/UI/app.py` (`✏️ Query auto-corrected for better retrieval: ...`) when a query is modified.
+  * Added `rapidfuzz` dependency to `requirements.txt`.
+* **Verification**:
+  * Executed comprehensive test suite (`scripts/test_query_enhancer.py`): **50/50 tests passed** with an average enhancer latency of **0.09 ms** (max 0.20 ms).
+  * OOD queries (e.g. broken arm, COVID-19) are not domain-shifted and strictly preserve 100% refusal gating.
+
+---
+
+## 8. Robustness Evaluation Results (Query Enhancer Suite)
+
+A dedicated robustness benchmark of **20 typo-heavy clinical and out-of-domain queries** (`ROB_01`–`ROB_18`, `ROB_OOD_01`–`ROB_OOD_02`) was executed through the complete pipeline in `scripts/run_evaluation.py`.
+
+* **Visualizations**: 
+  * [docs/figures/08_robustness_similarity_delta.png](file:///e:/Projects/Software%20Projects/RAGs/MedRetriv/docs/figures/08_robustness_similarity_delta.png)
+  * [docs/figures/09_robustness_clean_vs_enhanced.png](file:///e:/Projects/Software%20Projects/RAGs/MedRetriv/docs/figures/09_robustness_clean_vs_enhanced.png)
+
+### Summary of Robustness Findings
+
+| Metric | Result | Target / Interpretation | Status |
+|:---|:---:|:---|:---:|
+| **Robustness Test Pass Rate** | **19 / 20 (95.0%)** | $\ge 90.0\%$ | ✅ PASSED |
+| **Mean Top-1 Similarity Delta ($\Delta_{\text{enh} - \text{clean}}$)** | **+0.0034** | $\ge 0.0$ (Zero regression vs clean query) | ✅ PASSED |
+| **Out-of-Domain Safety Refusal Invariant** | **2 / 2 (100%)** | 100% (No false-positive domain shift on typos) | ✅ PASSED |
+| **Enhancer Component Latency (Standalone)** | **0.09 ms (max 0.20 ms)** | $< 10.0\text{ ms}$ budget | ✅ PASSED |
+| **End-to-End Typo Query Latency** | **29.2 ms (avg)** | $< 50.0\text{ ms}$ real-time ChromaDB retrieval | ✅ PASSED |
+
+### Per-Case Robustness Breakdown
+
+| Case ID | Typo Input Query | Corrected Query (`enhanced_query`) | Clean Score | Enhanced Score | $\Delta$ | Outcome |
+|:---|:---|:---|:---:|:---:|:---:|:---|
+| **ROB_01** | *What are the symptons of breast cancer?* | *What are the symptoms of breast cancer?* | 0.730 | 0.730 | 0.000 | ✅ PASS |
+| **ROB_02** | *What is the pathogensis of breast cancer?* | *What is the pathogenesis of breast cancer?* | 0.702 | 0.702 | 0.000 | ✅ PASS |
+| **ROB_03** | *What is the diagnosiss of breast cancer?* | *What is the diagnosis of breast cancer?* | 0.693 | 0.693 | 0.000 | ✅ PASS |
+| **ROB_04** | *What is mammografy screening?* | *What is mammography screening?* | 0.704 | 0.704 | 0.000 | ✅ PASS |
+| **ROB_05** | *What is chemotherpy for breast cancer?* | *What is chemotherapy for breast cancer?* | 0.636 | 0.636 | 0.000 | ✅ PASS |
+| **ROB_06** | *What are the treatmnt options for breast cancer?* | *What are the treatment options for breast cancer?* | 0.720 | 0.720 | 0.000 | ✅ PASS |
+| **ROB_07** | *What are the subtyps of breast cancer?* | *What are the subtypes of breast cancer?* | 0.759 | 0.759 | 0.000 | ✅ PASS |
+| **ROB_08** | *What is the prognossis for breast cancer?* | *What is the prognosis for breast cancer?* | 0.686 | 0.686 | 0.000 | ✅ PASS |
+| **ROB_09** | *What is tomosynthsis?* | *What is tomosynthesis?* | 0.299 | 0.299 | 0.000 | ⚠️ Refused (Corpus Gap for Ultra-Short Query) |
+| **ROB_10** | *What is metastis in breast cancer?* | *What is metastasis in breast cancer?* | 0.690 | 0.690 | 0.000 | ✅ PASS |
+| **ROB_11** | *What are the typse of brest cancer?* | *What are the types of breast cancer?* | 0.755 | 0.755 | 0.000 | ✅ PASS |
+| **ROB_12** | *What are the sings and symptons of brest cancer?* | *What are the signs and symptoms of breast cancer?* | 0.736 | 0.736 | 0.000 | ✅ PASS |
+| **ROB_13** | *What is the screning mammografy guideline?* | *What is the screening mammography guideline?* | 0.708 | 0.708 | 0.000 | ✅ PASS |
+| **ROB_14** | *what are the types of breast cancer* | *what are the types of breast cancer* | 0.755 | 0.815 | **+0.061** | ✅ PASS |
+| **ROB_15** | *What are the biomarkrs for breast cancer?* | *What are the biomarkers for breast cancer?* | 0.682 | 0.682 | 0.000 | ✅ PASS |
+| **ROB_16** | *What is the lumpectmy procedure?* | *What is the lumpectomy procedure?* | 0.672 | 0.672 | 0.000 | ✅ PASS |
+| **ROB_17** | *What is mastectmy for breast cancer?* | *What is mastectomy for breast cancer?* | 0.773 | 0.773 | 0.000 | ✅ PASS |
+| **ROB_18** | *How does densee breast densitty affect screenning?* | *How does dense breast density affect screening?* | 0.823 | 0.823 | 0.000 | ✅ PASS |
+| **ROB_OOD_01** | *What is the first-line treatmnt for a fractured arm?* | *What is the first-line treatment for a fractured arm?* | N/A | 0.251 | N/A | ✅ PASS (Safely Refused) |
+| **ROB_OOD_02** | *What are the symptons of COVID-19?* | *What are the symptoms of COVID-19?* | N/A | 0.239 | N/A | ✅ PASS (Safely Refused) |
+
+### Note on ROB_09 Analysis
+In `ROB_09`, the autocorrect engine accurately transformed `"What is tomosynthsis?"` $\rightarrow$ `"What is tomosynthesis?"`. However, because the clean query itself scores $0.299$ against the dense corpus without domain qualifiers, it triggered the pre-generation safety gate ($< 0.50$). This is a semantic retrieval density behavior on 3-word definitional queries rather than an autocorrect failure; fuller clinical queries (e.g. `SCR_06`: *"What is digital breast tomosynthesis (3D mammography)..."*) retrieve with high confidence ($\ge 0.70$).
+
+---
+
 > [!NOTE]
 > **Instructions for Future Updates**:  
 > This log should be updated after every significant change or fix from this point forward — append new entries to Section 2, update Section 3 if corpus changes, and move resolved items from Section 5 to Section 2 once implemented.
+

@@ -11,5 +11,5 @@ In-Domain Top-1 Similarity (Mean ± Std),0.733 ± 0.066,"Range: [0.642, 0.794] (
 Out-of-Domain Top-1 Similarity (Mean ± Std),0.271 ± 0.029,"Range: [0.109, 0.264] (Well below threshold 0.50)"
 Confidence Safety Separation Margin,0.266,> 0.35 safety delta separating in vs out-of-domain
 Unique Chunks Retrieved,133 / 515,25.8% corpus coverage across 24 test queries
-Average Retrieval Latency,35.8 ms,p95 = 43.1 ms (Real-time ChromaDB query)
-Average Total Query Latency,408.3 ms,p95 = 1624.9 ms (Includes safety check & generation)
+Average Retrieval Latency,34.5 ms,p95 = 41.3 ms (Real-time ChromaDB query)
+Average Total Query Latency,275.2 ms,p95 = 255.2 ms (Includes safety check & generation)
