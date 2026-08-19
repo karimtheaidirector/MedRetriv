@@ -9,7 +9,7 @@
 
 * **Project**: MedRetriv — Clinical Retrieval-Augmented Generation (RAG) for Breast Cancer Screening & Clinical Decision Support.
 * **Context**: Built for the 5-day AI Clinical Decision Support Lite hackathon.
-* **Timeline**: 5-day build (Currently Day 3).
+* **Timeline**: 5-day build (Currently Day 4).
 * **Team Structure**: Solo engineer.
 * **System Architecture & Stack**:
   * **Ingestion Layer**: Hybrid `pdfplumber` + `pypdf` text extraction, regex header/footer cleaner, section-aware paragraph & sentence chunker.
