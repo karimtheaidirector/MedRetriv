@@ -241,6 +241,21 @@ def get_theme_css(is_dark: bool) -> str:
             border: 1px solid #b45309;
         }
 
+        /* Fallback Synthesis Indicator Badge */
+        .fallback-indicator-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            color: #94a3b8 !important;
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            margin-top: 0.45rem;
+            font-style: italic;
+        }
+
         /* Evidence Expander Inner Items */
         .evidence-item {
             background: #0f172a;
@@ -461,6 +476,21 @@ def get_theme_css(is_dark: bool) -> str:
             color: #b45309 !important;
             background: #fffbeb;
             border: 1px solid #fde68a;
+        }
+
+        /* Fallback Synthesis Indicator Badge */
+        .fallback-indicator-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.75rem;
+            color: #64748b !important;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            padding: 0.2rem 0.55rem;
+            border-radius: 6px;
+            margin-top: 0.45rem;
+            font-style: italic;
         }
 
         /* Evidence Expander Inner Items */
@@ -730,6 +760,13 @@ for msg in current_chat["messages"]:
                     )
                     st.markdown(citation_html, unsafe_allow_html=True)
 
+                # Render fallback indicator if synthesized via backup engine
+                if generation_mode in ["fallback_synthesis", "offline_synthesis"] and query_type != "conversational":
+                    st.markdown(
+                        '<div class="fallback-indicator-badge">⚡ Grounded via Backup Evidence Synthesis</div>',
+                        unsafe_allow_html=True,
+                    )
+
                 # Expandable evidence panel (only if chunks were retrieved)
                 if chunks and query_type != "conversational":
                     with st.expander(f"🔍 View Evidence Used ({len(chunks)} Chunks)", expanded=False):
@@ -784,6 +821,7 @@ if current_chat["messages"] and current_chat["messages"][-1]["role"] == "user":
     top_score = res.get("top_score", 0.0)
     retrieved_chunks = res.get("retrieved_chunks", [])
     query_type = res.get("query_type", "clinical")
+    generation_mode = res.get("generation_mode", "")
 
     if not refused and query_type != "conversational":
         clean_prose, citation_badges = parse_and_clean_answer(raw_answer)
@@ -800,6 +838,7 @@ if current_chat["messages"] and current_chat["messages"][-1]["role"] == "user":
         "citations": citation_badges,
         "retrieved_chunks": retrieved_chunks,
         "query_type": query_type,
+        "generation_mode": generation_mode,
     })
 
     st.rerun()

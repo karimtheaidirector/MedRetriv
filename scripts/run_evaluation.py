@@ -280,7 +280,8 @@ for item in BENCHMARK_QUESTIONS:
     else:
         context = build_context(raw_results)
         prompt = build_prompt(question=question, context=context)
-        final_answer = generate_response(prompt)
+        gen_out = generate_response(prompt)
+        final_answer = gen_out[0] if isinstance(gen_out, (tuple, list)) else gen_out
         refused = STANDARD_REFUSAL_MESSAGE.lower() in final_answer.lower()
 
     # Total wall-clock time from start of retrieval to completion

@@ -262,6 +262,18 @@
 
 ---
 
+### Issue 21: Live LLM Truncation Validation & Grounded Fallback Transparency
+* **Discovered**: Day 4 — Asking `"breast cancerrr"` produced an answer that cut off mid-sentence (`"Breast cancer is a malignant disease that begins in"` with no period or citations) because the live Hugging Face provider returned a partial/truncated stream without raising an exception, slipping past basic empty-string guards.
+* **Root Cause**: `generate_response()` in `src/reasoning/llm.py` only checked `if not content or not content.strip()`. It lacked validation for minimum substantive length ($< 80$ chars), sentence termination (`[.!?]`), and mandatory evidence grounding tags (`[Source: ...]`).
+* **Change**:
+  * Added `_validate_live_response(content)` in `src/reasoning/llm.py` verifying sentence completeness, length, and citation tags before accepting live LLM responses.
+  * Configured `generate_response()` to automatically and gracefully trigger Grounded Evidence Synthesis when live responses fail validation.
+  * Added `generation_mode` and `fallback_triggered: True` tracking across `src/reasoning/main.py`, FastAPI `/chat`, and `src/logging/query_logger.py`.
+  * Added a subtle UI indicator badge (`⚡ Grounded via Backup Evidence Synthesis`) in `src/UI/app.py` for full transparency during live demonstrations.
+* **Verification**: Tested live with `"breast cancerrr"` and `"what is the breast cancer"` — both successfully intercepted partial text, cleanly executed evidence synthesis with 100% citation grounding, and logged `fallback_triggered: True` in query telemetry.
+
+---
+
 ## 3. Chunk & Corpus Statistics
 
 ### Document Breakdown & Section Counts

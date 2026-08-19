@@ -124,8 +124,8 @@ def chat(request: ChatRequest):
         context=context,
     )
 
-    # 6. Generate grounded answer
-    final_answer = generate_response(prompt)
+    # 6. Generate grounded answer (returns tuple: answer_text, generation_mode)
+    final_answer, generation_mode = generate_response(prompt)
     refused = STANDARD_REFUSAL_MESSAGE.lower() in final_answer.lower()
 
     # 7. Post-generation citation verification
@@ -133,6 +133,7 @@ def chat(request: ChatRequest):
     cit_verification = verify_citations(final_answer, chunk_records)
 
     # 8. Log query end-to-end with verification telemetry
+    fallback_triggered = generation_mode in ["fallback_synthesis", "offline_synthesis"]
     log_query(
         question=request.question,
         retrieved_chunks=chunk_records,
@@ -144,6 +145,8 @@ def chat(request: ChatRequest):
             "source": "api_chat",
             "citation_verification": cit_verification,
             "flagged_for_review": cit_verification.get("flagged_for_review", False),
+            "generation_mode": generation_mode,
+            "fallback_triggered": fallback_triggered,
         },
     )
 
@@ -155,6 +158,8 @@ def chat(request: ChatRequest):
         "top_score": top_score,
         "retrieved_chunks": chunk_records,
         "citation_verification": cit_verification,
+        "generation_mode": generation_mode,
+        "fallback_triggered": fallback_triggered,
     }
 
 

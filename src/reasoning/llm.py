@@ -16,6 +16,43 @@ MODEL_NAME = os.getenv(
     "openai/gpt-oss-20b:groq",
 )
 
+# Generation mode constants
+MODE_LIVE_LLM = "live_llm"
+MODE_FALLBACK_SYNTHESIS = "fallback_synthesis"
+MODE_OFFLINE = "offline_synthesis"
+
+# Citation tag pattern expected in every valid clinical answer
+_CITATION_TAG_RE = re.compile(r"\[Source:\s*.*?,\s*Page:\s*[^\]]+\]")
+
+# Sentence-ending punctuation
+_SENTENCE_END_RE = re.compile(r"[.!?][\s\"')\]]*$")
+
+
+def _validate_live_response(content: str) -> tuple:
+    """
+    Validate that a live LLM response is complete and properly grounded.
+
+    Returns (is_valid, reason) where reason explains any failure.
+    A valid clinical answer must:
+      1. Be at least 80 characters long (avoid trivially short fragments)
+      2. End with sentence-terminating punctuation (not mid-word truncation)
+      3. Contain at least one [Source: ...] citation tag (mandatory grounding)
+    """
+    if not content or len(content.strip()) < 80:
+        return False, f"Response too short ({len(content.strip())} chars)"
+
+    text = content.strip()
+
+    # Check for sentence-ending punctuation
+    if not _SENTENCE_END_RE.search(text):
+        return False, "Response does not end with sentence-terminating punctuation (truncated mid-sentence)"
+
+    # Check for at least one citation tag
+    if not _CITATION_TAG_RE.search(text):
+        return False, "Response contains no [Source: ...] citation tags (ungrounded)"
+
+    return True, "OK"
+
 
 def get_client() -> InferenceClient:
     token = os.getenv("HF_TOKEN")
@@ -101,16 +138,20 @@ def _synthesize_grounded_response(prompt: str) -> str:
     return " ".join(claims)
 
 
-def generate_response(prompt: str) -> str:
+def generate_response(prompt: str) -> tuple:
     """
     Generate an answer using the live HuggingFace LLM if HF_TOKEN is present,
     or gracefully synthesize from retrieved evidence chunks.
+
+    Returns:
+        tuple: (answer_text: str, generation_mode: str)
+            generation_mode is one of: 'live_llm', 'fallback_synthesis', 'offline_synthesis'
     """
     token = os.getenv("HF_TOKEN")
 
     if not token or token.strip() == "":
         print("[LLM Path] HF_TOKEN not configured — executing Grounded Evidence Synthesis")
-        return _synthesize_grounded_response(prompt)
+        return _synthesize_grounded_response(prompt), MODE_OFFLINE
 
     try:
         print(f"[LLM Path] Calling live Hugging Face Inference API ({MODEL_NAME})...")
@@ -132,11 +173,17 @@ def generate_response(prompt: str) -> str:
 
         if not content or not content.strip():
             print("[LLM Warning] Live API returned empty response — falling back to synthesis")
-            return _synthesize_grounded_response(prompt)
+            return _synthesize_grounded_response(prompt), MODE_FALLBACK_SYNTHESIS
+
+        # Validate the live response for completeness and grounding
+        is_valid, reason = _validate_live_response(content)
+        if not is_valid:
+            print(f"[LLM Warning] Live API response failed validation ({reason}) — falling back to synthesis")
+            return _synthesize_grounded_response(prompt), MODE_FALLBACK_SYNTHESIS
 
         print("[LLM Path] Live Hugging Face API generation successful.")
-        return content.strip()
+        return content.strip(), MODE_LIVE_LLM
 
     except Exception as e:
         print(f"[LLM Error] Live API call failed ({type(e).__name__}: {e}) — falling back to Grounded Evidence Synthesis")
-        return _synthesize_grounded_response(prompt)
+        return _synthesize_grounded_response(prompt), MODE_FALLBACK_SYNTHESIS
