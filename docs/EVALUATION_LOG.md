@@ -456,24 +456,60 @@ Repeated benchmark runs conducted back-to-back with zero code changes revealed i
 
 ---
 
-## 8. Robustness Evaluation Results (Clinical Query Recovery Suite)
+### Issue 24: Clean-vs-Typo Retrieval Equivalence & In-Place Intent Token Alignment
+* **Discovered**: Live comparison of `breast canser typs` vs. `breast cancer types` revealed differing downstream retrieval behavior when malformed intent words (`typs` $\rightarrow$ `types`) were either dropped or restored via token appending rather than in-place alignment.
+* **Root Cause**: The enhancer lacked candidate prioritization for clinical intent keywords (`types`, `symptoms`, `treatment`, `diagnosis`, `screening`, `pathogenesis`, `prognosis`, `causes`, `risk`, `factors`), allowing intent terms to be displaced or omitted during phrase-level substitution.
+* **Change**:
+  * Upgraded `_correct_single_token()` with strict candidate prioritization:
+    1. Exact known dictionary corrections (`TOKEN_TYPO_DICT`).
+    2. Intent token exact match (`INTENT_KEYWORDS`).
+    3. Consonant skeleton match (`CONSONANT_SKELETON_MAP`).
+    4. Fuzzy intent candidate matching against `INTENT_CANONICAL`.
+    5. Clinical vocabulary exact and fuzzy matching.
+  * Replaced append-style token preservation with `_align_and_substitute_intent_tokens()`, ensuring intent tokens are corrected in their exact original syntactic position.
+  * Implemented non-invention invariants (never inject intent into generic queries like `breast cancer`) and non-duplication guards (never produce `breast cancer types types`).
+  * Created dedicated clean-vs-typo benchmark suite in `scripts/test_retrieval_equivalence.py`.
+* **Verification**:
+  * Executed `scripts/test_retrieval_equivalence.py`: **8 / 8 pairs PASSED (100%)** with **100.0% Jaccard top-5 chunk overlap** and **0.0000 similarity delta**.
+  * Unit test suite in `scripts/test_query_enhancer.py` expanded to **76 / 76 PASSED (100%)**.
 
-A comprehensive robustness benchmark of **28 typo-heavy, severely corrupted, and out-of-domain queries** (`ROB_01`–`ROB_24`, `ROB_OOD_01`–`ROB_OOD_04`) was executed through the complete pipeline in `scripts/run_evaluation.py`.
+---
+
+### Issue 25: Standardized `GenerationResult` Return Contract in `src/reasoning/llm.py`
+* **Discovered**: Running `notebooks/evaluation_report.ipynb` resulted in `AttributeError: 'tuple' object has no attribute 'lower'` during response generation.
+* **Root Cause**: `generate_response()` in `src/reasoning/llm.py` returned an untyped tuple `(answer_text, generation_mode)` on some paths and strings on others, breaking callers that expected a uniform return structure.
+* **Change**:
+  * Defined `@dataclass class GenerationResult` with fields:
+    * `answer: str` (final grounded clinical answer text)
+    * `generation_mode: str` (`live_llm`, `fallback_synthesis`, or `offline_synthesis`)
+    * `fallback_triggered: bool = False`
+  * Standardized all return paths in `src/reasoning/llm.py` to return `GenerationResult`.
+  * Updated all callers across the codebase (`src/reasoning/main.py`, `src/API/main.py`, `scripts/run_evaluation.py`, `notebooks/evaluation_report.ipynb`) to extract `result.answer`, `result.generation_mode`, and `result.fallback_triggered`.
+* **Verification**:
+  * Diagnostic assertions verified: `isinstance(result, GenerationResult)` and `isinstance(result.answer, str)`.
+  * Re-ran full benchmark evaluation in `scripts/run_evaluation.py` (24/24 benchmark, 28/28 robustness) and notebook evaluation cells with 100% pass rate and zero attribute errors.
+
+---
+
+## 8. Robustness & Equivalence Evaluation Results
+
+A comprehensive robustness and retrieval-equivalence suite spanning **28 typo-heavy/corrupted queries** (`ROB_01`–`ROB_24`, `ROB_OOD_01`–`ROB_OOD_04`) and **8 clean-vs-typo clinical pairs** was executed across the full pipeline in `scripts/run_evaluation.py` and `scripts/test_retrieval_equivalence.py`.
 
 * **Visualizations**: 
   * [docs/figures/08_robustness_similarity_delta.png](file:///e:/Projects/Software%20Projects/RAGs/MedRetriv/docs/figures/08_robustness_similarity_delta.png)
   * [docs/figures/09_robustness_clean_vs_enhanced.png](file:///e:/Projects/Software%20Projects/RAGs/MedRetriv/docs/figures/09_robustness_clean_vs_enhanced.png)
 
-### Summary of Robustness Findings
+### Summary of Robustness & Equivalence Findings
 
 | Metric | Result | Target / Interpretation | Status |
 |:---|:---:|:---|:---:|
 | **Robustness Test Pass Rate** | **28 / 28 (100.0%)** | $\ge 90.0\%$ | ✅ PASSED |
+| **Retrieval Equivalence Pass Rate** | **8 / 8 (100.0%)** | $\ge 80.0\%$ Jaccard chunk overlap | ✅ PASSED |
 | **Mean Top-1 Similarity Delta ($\Delta_{\text{enh} - \text{clean}}$)** | **+0.0041** | $\ge 0.0$ (Zero regression vs clean baseline) | ✅ PASSED |
 | **Out-of-Domain Safety Refusal Invariant** | **4 / 4 (100%)** | 100% (No false-positive domain shift on typos) | ✅ PASSED |
-| **Enhancer Standalone Unit Suite** | **65 / 65 (100.0%)** | Full coverage across Easy, Medium, Hard, Very Hard | ✅ PASSED |
-| **Enhancer Standalone Component Latency** | **0.31 ms (max 0.53 ms)** | $< 10.0\text{ ms}$ budget | ✅ PASSED |
-| **End-to-End Query Latency (incl. ChromaDB)** | **53.16 ms (avg)** | Real-time multi-candidate vector search | ✅ PASSED |
+| **Enhancer Standalone Unit Suite** | **76 / 76 (100.0%)** | Full coverage across Easy, Medium, Hard, In-Place | ✅ PASSED |
+| **Enhancer Standalone Component Latency** | **0.27 ms (max 0.47 ms)** | $< 10.0\text{ ms}$ budget | ✅ PASSED |
+| **End-to-End Query Latency (incl. ChromaDB)** | **52.43 ms (avg)** | Real-time multi-candidate vector search | ✅ PASSED |
 
 ### Per-Case Robustness Breakdown
 
@@ -504,12 +540,9 @@ A comprehensive robustness benchmark of **28 typo-heavy, severely corrupted, and
 | **ROB_23** | *what are the symptns of brest cance* | *what are the symptoms of breast cancer* | 0.730 | 0.738 | **+0.008** | ✅ PASS |
 | **ROB_24** | *wht r the symptons of brst cancr* | *what are the symptoms of breast cancer* | 0.730 | 0.738 | **+0.008** | ✅ PASS |
 | **ROB_OOD_01** | *What is the first-line treatmnt for a fractured arm?* | *What is the first-line treatment for a fractured arm?* | N/A | 0.251 | N/A | ✅ PASS (Safely Refused) |
-| **ROB_OOD_02** | *What are the symptons of COVID-19?* | *What are the symptoms of COVID-19?* | N/A | 0.290 | N/A | ✅ PASS (Safely Refused) |
-| **ROB_OOD_03** | *How do I fix my car engien?* | *How do I fix my car engine?* | N/A | 0.101 | N/A | ✅ PASS (Safely Refused) |
+| **ROB_OOD_02** | *What are the symptons of COVID-19?* | *What are the symptoms of COVID-19?* | N/A | 0.265 | N/A | ✅ PASS (Safely Refused) |
+| **ROB_OOD_03** | *How do I fix my car engien?* | *How do I fix my car engine?* | N/A | 0.115 | N/A | ✅ PASS (Safely Refused) |
 | **ROB_OOD_04** | *What is the weather tomorow?* | *What is the weather tomorrow?* | N/A | 0.214 | N/A | ✅ PASS (Safely Refused) |
-
-### Note on ROB_09 Analysis
-In `ROB_09`, the autocorrect engine accurately transformed `"What is tomosynthsis?"` $\rightarrow$ `"What is tomosynthesis?"`. However, because the clean query itself scores $0.299$ against the dense corpus without domain qualifiers, it triggered the pre-generation safety gate ($< 0.50$). This is a semantic retrieval density behavior on 3-word definitional queries rather than an autocorrect failure; fuller clinical queries (e.g. `SCR_06`: *"What is digital breast tomosynthesis (3D mammography)..."*) retrieve with high confidence ($\ge 0.70$).
 
 ---
 

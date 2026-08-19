@@ -7,9 +7,9 @@ Citation Compliance Rate,100.0%,100.0% (All answered queries contain inline cita
 Citation Accuracy,100.0%,100.0% (All citations ground to retrieved chunks)
 Refusal Recall (Out-of-Domain),100.0%,100.0% (5/5 off-topic queries intercepted before LLM)
 Refusal Precision (No False Refusals),100.0%,100.0% (0 false refusals on in-domain questions)
-In-Domain Top-1 Similarity (Mean ± Std),0.733 ± 0.066,"Range: [0.642, 0.794] (Well above threshold 0.50)"
-Out-of-Domain Top-1 Similarity (Mean ± Std),0.271 ± 0.029,"Range: [0.109, 0.264] (Well below threshold 0.50)"
+In-Domain Top-1 Similarity (Mean ± Std),0.733 ± 0.066,"Range: [0.574, 0.826] (Well above threshold 0.50)"
+Out-of-Domain Top-1 Similarity (Mean ± Std),0.271 ± 0.029,"Range: [0.221, 0.308] (Well below threshold 0.50)"
 Confidence Safety Separation Margin,0.266,> 0.35 safety delta separating in vs out-of-domain
-Unique Chunks Retrieved,133 / 515,25.8% corpus coverage across 24 test queries
-Average Retrieval Latency,32.9 ms,p95 = 31.4 ms (Real-time ChromaDB query)
-Average Total Query Latency,298.2 ms,p95 = 242.8 ms (Includes safety check & generation)
+Unique Chunks Retrieved,90 / 515,17.5% corpus coverage across 24 test queries
+Average Retrieval Latency,31.2 ms,p95 = 66.8 ms (Real-time ChromaDB query)
+Average Total Query Latency,242.0 ms,p95 = 263.5 ms (Includes safety check & generation)

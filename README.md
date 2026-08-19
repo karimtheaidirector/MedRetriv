@@ -16,9 +16,9 @@ MedRetriv is an AI Clinical Decision Support (CDS) Retrieval-Augmented Generatio
 
 ---
 
-## Verified Evaluation Benchmark Metrics (Day 4 & Robustness Suite)
+## Verified Evaluation Benchmark Metrics (Day 4, Robustness & Equivalence Suite)
 
-Evaluated across a standardized 24-question benchmark suite plus a 28-case clinical query recovery robustness evaluation spanning general definitional, screening-specific, severely corrupted, and out-of-domain queries:
+Evaluated across a standardized 24-question benchmark suite, 28-case robustness suite, and 8 clean-vs-typo retrieval equivalence benchmark pairs:
 
 | Metric Name | Result | Target / Interpretation |
 |:---|:---:|:---:|
@@ -31,9 +31,10 @@ Evaluated across a standardized 24-question benchmark suite plus a 28-case clini
 | **Refusal Recall (Out-of-Domain)** | **100.0%** | All off-topic queries intercepted before LLM |
 | **Refusal Precision (No False Refusals)** | **100.0%** | 0 false refusals on valid clinical questions |
 | **Robustness Suite Pass Rate (Recovery Engine)** | **28 / 28 (100.0%)** | Full recovery on severe multi-word typos |
-| **Standalone Unit Test Suite** | **65 / 65 (100.0%)** | Easy, Medium, Hard, Very Hard & OOD safety |
+| **Clean-vs-Typo Retrieval Equivalence** | **8 / 8 (100.0%)** | 100.0% Top-5 chunk Jaccard overlap on equivalent pairs |
+| **Standalone Unit Test Suite** | **76 / 76 (100.0%)** | Easy, Medium, Hard, Very Hard & In-Place Alignment |
 | **Mean Similarity Delta on Typo Queries ($\Delta$)** | **+0.0041** | Parity or improvement over clean queries |
-| **Enhancer Standalone Latency** | **0.31 ms (max 0.53 ms)** | Ultra-fast pre-retrieval autocorrect |
+| **Enhancer Standalone Latency** | **0.27 ms (max 0.47 ms)** | Ultra-fast pre-retrieval autocorrect |
 | **In-Domain Top-1 Similarity** | **0.733 ± 0.064** | Range: $[0.574, 0.818]$ (Well above $0.50$) |
 | **Out-of-Domain Top-1 Similarity** | **0.258 ± 0.020** | Range: $[0.101, 0.290]$ (Well below $0.50$) |
 | **Retrieval Latency by Category** | **Out-of-Domain: ~19 ms \| Screening: ~19–23 ms \| General Definitional: ~44–97 ms** | Varies with retrieval breadth and model warm-up state |
