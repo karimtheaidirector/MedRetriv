@@ -110,8 +110,11 @@ def answer_question(
         context=context,
     )
 
-    # 6. Generate answer via LLM (returns tuple: answer_text, generation_mode)
-    final_answer, generation_mode = generate_response(prompt)
+    # 6. Generate answer via LLM
+    gen_result = generate_response(prompt)
+    final_answer = gen_result.answer
+    generation_mode = gen_result.generation_mode
+    fallback_triggered = gen_result.fallback_triggered
 
     # 7. Check if model produced a refusal
     refused = STANDARD_REFUSAL_MESSAGE.lower() in final_answer.lower()
@@ -121,7 +124,6 @@ def answer_question(
     cit_verification = verify_citations(final_answer, chunk_records)
 
     # 9. Log the complete query execution with verification telemetry
-    fallback_triggered = generation_mode in ["fallback_synthesis", "offline_synthesis"]
     log_query(
         question=question,
         retrieved_chunks=chunk_records,

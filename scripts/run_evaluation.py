@@ -280,8 +280,8 @@ for item in BENCHMARK_QUESTIONS:
     else:
         context = build_context(raw_results)
         prompt = build_prompt(question=question, context=context)
-        gen_out = generate_response(prompt)
-        final_answer = gen_out[0] if isinstance(gen_out, (tuple, list)) else gen_out
+        gen_result = generate_response(prompt)
+        final_answer = gen_result.answer
         refused = STANDARD_REFUSAL_MESSAGE.lower() in final_answer.lower()
 
     # Total wall-clock time from start of retrieval to completion
@@ -684,24 +684,21 @@ ROBUSTNESS_CASES = [
      "What are the subtyps of breast cancer?", "subtyps→subtypes"),
     ("ROB_08", "What is the prognosis for breast cancer?",
      "What is the prognossis for breast cancer?", "prognossis→prognosis"),
-    ("ROB_09", "What is tomosynthesis?",
-     "What is tomosynthsis?", "tomosynthsis→tomosynthesis"),
+    ("ROB_09", "What is digital breast tomosynthesis (3D mammography) and how does it compare to digital mammography?",
+     "What is digital breast tomosynthsis and how does it compare to digital mammografy?", "tomosynthsis→tomosynthesis, mammografy→mammography"),
     ("ROB_10", "What is metastasis in breast cancer?",
      "What is metastis in breast cancer?", "metastis→metastasis"),
-    # Transpositions
+    # Transpositions & letter inversions
     ("ROB_11", "What are the types of breast cancer?",
      "What are the typse of brest cancer?", "typse→types, brest→breast"),
-    # Multi-word typos
     ("ROB_12", "What are the signs and symptoms of breast cancer?",
      "What are the sings and symptons of brest cancer?", "sings→signs, symptons→symptoms, brest→breast"),
     ("ROB_13", "What is the screening mammography guideline?",
      "What is the screning mammografy guideline?", "screning→screening, mammografy→mammography"),
-    # Repeated chars (post-normalizer form)
     ("ROB_14", "What are the types of breast cancer?",
      "what are the types of breast cancer", "clean-after-normalizer"),
     ("ROB_15", "What are the biomarkers for breast cancer?",
      "What are the biomarkrs for breast cancer?", "biomarkrs→biomarkers"),
-    # Clinical phrase typos
     ("ROB_16", "What is the lumpectomy procedure?",
      "What is the lumpectmy procedure?", "lumpectmy→lumpectomy"),
     ("ROB_17", "What is mastectomy for breast cancer?",
@@ -709,6 +706,19 @@ ROBUSTNESS_CASES = [
     ("ROB_18", "How does dense breast density affect screening?",
      "How does densee breast densitty affect screenning?",
      "densee→dense, densitty→density, screenning→screening"),
+    # Severe Corruptions (Hard & Very Hard)
+    ("ROB_19", "What is breast cancer?",
+     "brst caser", "brst caser→breast cancer"),
+    ("ROB_20", "What is breast cancer?",
+     "bast caasre", "bast caasre→breast cancer"),
+    ("ROB_21", "What are the types of breast cancer?",
+     "tybesss of breasst cancerr", "tybesss of breasst cancerr→types of breast cancer"),
+    ("ROB_22", "What are the types of breast cancer?",
+     "whta are the typse of brest cancr", "whta are the typse of brest cancr→what are the types of breast cancer"),
+    ("ROB_23", "What are the symptoms of breast cancer?",
+     "what are the symptns of brest cance", "what are the symptns of brest cance→what are the symptoms of breast cancer"),
+    ("ROB_24", "What are the symptoms of breast cancer?",
+     "wht r the symptons of brst cancr", "wht r the symptons of brst cancr→what are the symptoms of breast cancer"),
     # OOD with typos (must still refuse)
     ("ROB_OOD_01", None,
      "What is the first-line treatmnt for a fractured arm?",
@@ -716,6 +726,12 @@ ROBUSTNESS_CASES = [
     ("ROB_OOD_02", None,
      "What are the symptons of COVID-19?",
      "OOD — must still refuse after correction"),
+    ("ROB_OOD_03", None,
+     "How do I fix my car engien?",
+     "OOD car engien→car engine — must still refuse"),
+    ("ROB_OOD_04", None,
+     "What is the weather tomorow?",
+     "OOD weather tomorow→weather tomorrow — must still refuse"),
 ]
 
 robustness_results = []

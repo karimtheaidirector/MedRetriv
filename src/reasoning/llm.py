@@ -1,6 +1,8 @@
 import os
 import re
 import logging
+from dataclasses import dataclass
+from typing import Optional
 
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
@@ -21,6 +23,17 @@ MODE_LIVE_LLM = "live_llm"
 MODE_FALLBACK_SYNTHESIS = "fallback_synthesis"
 MODE_OFFLINE = "offline_synthesis"
 
+
+@dataclass
+class GenerationResult:
+    """
+    Standardized, structured return contract for all response generation paths.
+    """
+    answer: str
+    generation_mode: str
+    fallback_triggered: bool = False
+
+
 # Citation tag pattern expected in every valid clinical answer
 _CITATION_TAG_RE = re.compile(r"\[Source:\s*.*?,\s*Page:\s*[^\]]+\]")
 
@@ -39,28 +52,22 @@ def _validate_live_response(content: str) -> tuple:
       3. Contain at least one [Source: ...] citation tag (mandatory grounding)
     """
     if not content or len(content.strip()) < 80:
-        return False, f"Response too short ({len(content.strip())} chars)"
+        return False, "Response too short (< 80 characters)"
 
-    text = content.strip()
-
-    # Check for sentence-ending punctuation
-    if not _SENTENCE_END_RE.search(text):
+    if not _SENTENCE_END_RE.search(content.strip()):
         return False, "Response does not end with sentence-terminating punctuation (truncated mid-sentence)"
 
-    # Check for at least one citation tag
-    if not _CITATION_TAG_RE.search(text):
-        return False, "Response contains no [Source: ...] citation tags (ungrounded)"
+    if not _CITATION_TAG_RE.search(content):
+        return False, "Response does not contain valid [Source: ...] citation tags"
 
-    return True, "OK"
+    return True, "valid"
 
 
 def get_client() -> InferenceClient:
     token = os.getenv("HF_TOKEN")
-    if not token or not token.strip():
-        raise EnvironmentError(
-            "HF_TOKEN is missing or empty. Please set HF_TOKEN in your .env file."
-        )
-    return InferenceClient(api_key=token)
+    return InferenceClient(
+        token=token,
+    )
 
 
 def _clean_evidence_sentence(sentence: str) -> str:
@@ -77,8 +84,6 @@ def _synthesize_grounded_response(prompt: str) -> str:
     Dynamically synthesize a coherent, evidence-grounded clinical answer directly
     from the retrieved evidence chunks when live LLM API is unavailable.
     """
-    print("[LLM Path] Generating response via Grounded Evidence Synthesis (Offline/Fallback Mode)")
-
     blocks = re.split(r"---\s*Evidence Chunk", prompt)
     if len(blocks) <= 1:
         return STANDARD_REFUSAL_MESSAGE
@@ -104,7 +109,6 @@ def _synthesize_grounded_response(prompt: str) -> str:
             if len(s.strip()) > 35
         ]
 
-        # Filter out web navigation, news list headers, table headers, and retrieval context prefixes
         meaningful_sentences = []
         for s in raw_sentences:
             s_lower = s.lower()
@@ -119,7 +123,6 @@ def _synthesize_grounded_response(prompt: str) -> str:
                 meaningful_sentences.append(cleaned)
 
         if meaningful_sentences:
-            # Select the most substantive sentence not already stated
             selected = None
             for s in meaningful_sentences:
                 key = s[:40].lower()
@@ -139,20 +142,24 @@ def _synthesize_grounded_response(prompt: str) -> str:
     return " ".join(claims)
 
 
-def generate_response(prompt: str) -> tuple:
+def generate_response(prompt: str) -> GenerationResult:
     """
     Generate an answer using the live HuggingFace LLM if HF_TOKEN is present,
     or gracefully synthesize from retrieved evidence chunks.
 
     Returns:
-        tuple: (answer_text: str, generation_mode: str)
-            generation_mode is one of: 'live_llm', 'fallback_synthesis', 'offline_synthesis'
+        GenerationResult containing answer (str), generation_mode (str),
+        and fallback_triggered (bool).
     """
     token = os.getenv("HF_TOKEN")
 
     if not token or token.strip() == "":
         print("[LLM Path] HF_TOKEN not configured — executing Grounded Evidence Synthesis")
-        return _synthesize_grounded_response(prompt), MODE_OFFLINE
+        return GenerationResult(
+            answer=_synthesize_grounded_response(prompt),
+            generation_mode=MODE_OFFLINE,
+            fallback_triggered=True,
+        )
 
     try:
         print(f"[LLM Path] Calling live Hugging Face Inference API ({MODEL_NAME})...")
@@ -174,17 +181,33 @@ def generate_response(prompt: str) -> tuple:
 
         if not content or not content.strip():
             print("[LLM Warning] Live API returned empty response — falling back to synthesis")
-            return _synthesize_grounded_response(prompt), MODE_FALLBACK_SYNTHESIS
+            return GenerationResult(
+                answer=_synthesize_grounded_response(prompt),
+                generation_mode=MODE_FALLBACK_SYNTHESIS,
+                fallback_triggered=True,
+            )
 
         # Validate the live response for completeness and grounding
         is_valid, reason = _validate_live_response(content)
         if not is_valid:
             print(f"[LLM Warning] Live API response failed validation ({reason}) — falling back to synthesis")
-            return _synthesize_grounded_response(prompt), MODE_FALLBACK_SYNTHESIS
+            return GenerationResult(
+                answer=_synthesize_grounded_response(prompt),
+                generation_mode=MODE_FALLBACK_SYNTHESIS,
+                fallback_triggered=True,
+            )
 
         print("[LLM Path] Live Hugging Face API generation successful.")
-        return content.strip(), MODE_LIVE_LLM
+        return GenerationResult(
+            answer=content.strip(),
+            generation_mode=MODE_LIVE_LLM,
+            fallback_triggered=False,
+        )
 
     except Exception as e:
         print(f"[LLM Error] Live API call failed ({type(e).__name__}: {e}) — falling back to Grounded Evidence Synthesis")
-        return _synthesize_grounded_response(prompt), MODE_FALLBACK_SYNTHESIS
+        return GenerationResult(
+            answer=_synthesize_grounded_response(prompt),
+            generation_mode=MODE_FALLBACK_SYNTHESIS,
+            fallback_triggered=True,
+        )

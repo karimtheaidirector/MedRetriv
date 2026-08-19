@@ -746,11 +746,11 @@ for msg in current_chat["messages"]:
                         conf_html = f'<div class="confidence-tag conf-mod">🟡 Moderate confidence match ({top_score:.2f})</div>'
                     st.markdown(conf_html, unsafe_allow_html=True)
 
-                # Subtle correction indicator — shown only when a typo was autocorrected
+                # Subtle enhancement indicator — shown only when a query was enhanced
                 if query_changed and enhanced_query:
                     st.markdown(
-                        f'<div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px;">'
-                        f'✏️ Query auto-corrected for better retrieval: <em>{html.escape(enhanced_query)}</em>'
+                        f'<div style="font-size:0.78rem;color:#64748b;margin-bottom:6px;background:rgba(2,132,199,0.06);padding:4px 8px;border-radius:4px;border-left:2px solid #0284c7;">'
+                        f'✏️ <strong>Query enhanced for retrieval:</strong> <em>{html.escape(enhanced_query)}</em>'
                         f'</div>',
                         unsafe_allow_html=True,
                     )
