@@ -719,6 +719,7 @@ for msg in current_chat["messages"]:
     chunks = msg.get("retrieved_chunks", [])
     top_score = msg.get("top_score", 0.0)
     query_type = msg.get("query_type", "clinical")
+    generation_mode = msg.get("generation_mode", "live")
 
     if role == "user":
         with st.chat_message("user", avatar="👤"):
