@@ -1,4 +1,7 @@
+import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.Retrieval.query import retrieve_documents
@@ -14,6 +17,24 @@ app = FastAPI(
     description="Clinical Retrieval-Augmented Generation API with Safety Verification and Citation Enforcement",
     version="1.0.0",
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def add_no_cache_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 
 
 class ChatMessage(BaseModel):
@@ -188,9 +209,15 @@ def get_logs(limit: int = 50):
     return {"total": len(logs), "logs": logs[-limit:]}
 
 
-@app.get("/")
-def root():
+@app.get("/api/info")
+def api_info():
     return {
         "message": "MedRetriv Clinical Decision Support API is running",
         "confidence_threshold": CONFIDENCE_THRESHOLD,
     }
+
+
+# Mount 3D Web UI Static Files
+web_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "UI", "web"))
+if os.path.exists(web_dir):
+    app.mount("/", StaticFiles(directory=web_dir, html=True), name="static_web")

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>MedRetriv — 3D Clinical Evidence Assistant</title>
+  <meta name="description" content="Dr. MedRetriv — AI-powered 3D clinical evidence assistant for breast cancer guidelines.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=v2026_robot_final">
+
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
+</head>
+<body class="dark-theme">
+
+  <!-- Full-Screen 3D Background Canvas -->
+  <div id="canvas-container">
+    <canvas id="canvas3d"></canvas>
+  </div>
+
+  <!-- UI Overlay Layer -->
+  <div id="ui-overlay">
+
+    <!-- Hamburger Button (top-left) -->
+    <button id="burger-btn" class="burger-btn" title="Menu" aria-label="Open Menu">
+      <span></span><span></span><span></span>
+    </button>
+
+    <!-- Slide-Out Drawer Menu -->
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <nav id="drawer" class="drawer">
+      <div class="drawer-header">
+        <div class="brand-logo">
+          <span class="logo-icon">🩺</span>
+          <span class="brand-name">MedRetriv <span class="brand-badge">3D AI</span></span>
+        </div>
+        <button id="drawer-close-btn" class="drawer-close-btn" aria-label="Close Menu">✕</button>
+      </div>
+
+      <div class="drawer-system-status">
+        <span class="status-dot green-pulse"></span>
+        <span>Grounded Engine Ready</span>
+      </div>
+
+      <div class="drawer-section-title">ACTIONS</div>
+      <button id="new-consultation-btn" class="drawer-action-btn primary-btn">
+        <span>＋</span> New Consultation
+      </button>
+      <button id="export-chat-btn" class="drawer-action-btn">
+        <span>📥</span> Export Notes
+      </button>
+      <button id="theme-toggle-btn" class="drawer-action-btn">
+        <span class="theme-icon">🌙</span> <span class="theme-label">Dark Theme</span>
+      </button>
+      <!-- TTS Toggle in Drawer -->
+      <button id="tts-toggle-btn" class="drawer-action-btn" title="Toggle Dr. MedRetriv voice">
+        <span id="tts-icon">🔊</span> <span id="tts-label">Voice: On</span>
+      </button>
+      <button id="clear-history-btn" class="drawer-action-btn danger">
+        <span>🗑️</span> Clear History
+      </button>
+
+      <div class="drawer-section-title">CONSULTATIONS</div>
+      <div class="consultation-list" id="consultation-list"></div>
+
+      <div class="drawer-section-title">SYSTEM TELEMETRY</div>
+      <div class="corpus-stats-card">
+        <div class="stat-row"><span>📚 Sources:</span><strong>5 Guidelines</strong></div>
+        <div class="stat-row"><span>🧩 Chunks:</span><strong>515</strong></div>
+        <div class="stat-row"><span>🛡️ Gate:</span><strong>Cosine ≥ 0.50</strong></div>
+        <div class="stat-row"><span>⚡ Latency:</span><strong>&lt;100ms</strong></div>
+      </div>
+    </nav>
+
+    <!-- Right-Side Chat Panel -->
+    <main class="chat-panel" id="chat-panel">
+      <!-- Chat Header -->
+      <div class="chat-header">
+        <div class="robot-badge-inline">
+          <span id="robot-emoji">🤖</span>
+        </div>
+        <div class="chat-header-info">
+          <span class="chat-title">Dr. MedRetriv</span>
+          <span class="chat-status" id="robot-state-text">Ready to assist clinical decisions</span>
+        </div>
+        <!-- TTS & Voice buttons in header (mobile visible) -->
+        <div class="chat-header-actions">
+          <button id="lang-toggle-btn" class="icon-action-btn" title="Switch to Arabic / التبديل للعربية" aria-label="Toggle language">🇬🇧</button>
+          <button id="tts-header-btn" class="icon-action-btn active" title="Toggle voice output" aria-label="Toggle TTS">🔊</button>
+        </div>
+      </div>
+
+      <!-- Starter Prompts (hidden when messages exist) -->
+      <div class="starter-prompts-container" id="starter-prompts-container">
+        <div class="starter-title">💡 Suggested Clinical Queries</div>
+        <div class="starter-prompts-grid">
+          <button class="starter-card" data-prompt="What are the 2024 USPSTF breast cancer screening recommendations for average-risk women?">
+            <div class="starter-card-icon">🩺</div>
+            <div class="starter-card-text">
+              <strong>USPSTF 2024 Guidelines</strong>
+              <span>Screening age &amp; interval recommendations</span>
+            </div>
+          </button>
+          <button class="starter-card" data-prompt="When is supplemental breast MRI or ultrasound indicated over screening mammography alone?">
+            <div class="starter-card-icon">🔬</div>
+            <div class="starter-card-text">
+              <strong>Breast MRI Indications</strong>
+              <span>Dense breasts &amp; high-risk protocols</span>
+            </div>
+          </button>
+          <button class="starter-card" data-prompt="Explain BI-RADS Category 4 sub-categories (4A, 4B, 4C) and recommended management steps.">
+            <div class="starter-card-icon">📊</div>
+            <div class="starter-card-text">
+              <strong>BI-RADS Category 4</strong>
+              <span>Malignancy risk &amp; biopsy protocol</span>
+            </div>
+          </button>
+          <button class="starter-card" data-prompt="Which high-risk genetic mutations (e.g. BRCA1/2, TP53) warrant enhanced early screening protocols?">
+            <div class="starter-card-icon">🧬</div>
+            <div class="starter-card-text">
+              <strong>High-Risk Mutations</strong>
+              <span>BRCA1/2 &amp; TP53 screening criteria</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div class="chat-viewport" id="chat-viewport"></div>
+
+      <!-- Input -->
+      <div class="chat-input-wrapper">
+        <!-- Mic button for voice input (#9) -->
+        <button id="mic-btn" class="mic-btn" title="Voice input (hold to speak)" aria-label="Voice input">
+          <svg id="mic-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+        </button>
+        <textarea id="user-input" placeholder="Ask a clinical breast cancer or screening question... (or tap 🎤)" rows="1"></textarea>
+        <button id="send-btn" class="send-btn" title="Send (Enter)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+      <div class="chat-input-disclaimer">
+        MedRetriv provides grounded evidence from USPSTF, AHRQ, NCI, Nature &amp; Frontiers corpus. Answers require professional clinical judgment.
+      </div>
+    </main>
+
+  </div><!-- end #ui-overlay -->
+
+  <script src="robot3d.js?v=robov4_magenta_fix_v10"></script>
+  <script src="app.js?v=robov4_magenta_fix_v10"></script>
+</body>
+</html>
