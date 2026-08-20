@@ -65,6 +65,7 @@ datasets
 scikit-learn
 rank-bm25
 rapidfuzz
+seaborn
 
 # =========================
 # Experimentation / Visualization
