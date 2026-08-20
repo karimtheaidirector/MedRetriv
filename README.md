@@ -163,19 +163,27 @@ python scripts/test_retrieval_equivalence.py
 * Summary Metrics CSV: `docs/evaluation_summary.csv`
 * Visualizations: `docs/figures/` (9 presentation-ready figures)
 
-### 3. Launch Application (FastAPI Backend + Streamlit UI)
+### 3. Launch Application
 
-**Terminal 1 — FastAPI Backend Server:**
+#### Option 1: FastAPI Backend + 3D Web UI (Recommended)
+
+FastAPI automatically mounts and serves the interactive 3D Web UI (`src/UI/web/`) at the root endpoint while providing the `/chat` RAG API:
+
 ```bash
 uvicorn src.API.main:app --reload --port 8000
 ```
-API Documentation available at: `http://127.0.0.1:8000/docs`
 
-**Terminal 2 — Streamlit Research UI:**
+* **3D Web Assistant UI**: `http://127.0.0.1:8000` (loads `src/UI/web/app.js` with 3D avatar, voice input, and TTS)
+* **Interactive API Docs (Swagger UI)**: `http://127.0.0.1:8000/docs`
+
+#### Option 2: Streamlit Research UI
+
+To run the standalone multi-chat Streamlit dashboard:
+
 ```bash
 streamlit run src/UI/app.py
 ```
-UI available at: `http://localhost:8501`
+* **Streamlit UI**: `http://localhost:8501`
 
 ---
 
@@ -254,8 +262,13 @@ MedRetriv/
     │   ├── embedder.py
     │   ├── main.py
     │   └── query.py
-    ├── UI/                                     # Streamlit clinical research dashboard
-    │   └── app.py
+    ├── UI/                                     # User interfaces
+    │   ├── app.py                              # Streamlit clinical research dashboard
+    │   └── web/                                # 3D Web UI (FastAPI static mount)
+    │       ├── app.js                          # Frontend client controller & TTS bridge
+    │       ├── index.html                      # Web layout & overlay
+    │       ├── robot3d.js                      # Three.js 3D avatar & animation engine
+    │       └── styles.css                      # Modern dark/light glassmorphic theme
     └── vectordb/                               # ChromaDB persistent client & indexer
         ├── database.py
         ├── indexer.py
